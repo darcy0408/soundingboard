@@ -1,0 +1,30 @@
+{
+  "name": "soundingboard-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cloudflare Worker backend for SoundingBoard (persona turns, feedback, TTS proxy).",
+  "type": "module",
+  "scripts": {
+    "generate-prompts": "node scripts/extract-prompts.mjs",
+    "prebuild": "npm run generate-prompts",
+    "predeploy": "npm run generate-prompts",
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "dev": "npm run generate-prompts && wrangler dev",
+    "deploy": "npm run generate-prompts && wrangler deploy",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "stress-test": "npx tsx scripts/persona-stress-test.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "hono": "^4.6.14"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241224.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8",
+    "wrangler": "^3.99.0"
+  }
+}

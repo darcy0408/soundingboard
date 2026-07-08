@@ -1,0 +1,32 @@
+name = "soundingboard-api"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+# ---------------------------------------------------------------------------
+# Secrets (NEVER put these here — set via `wrangler secret put <NAME>`):
+#   ANTHROPIC_API_KEY   Anthropic API key used for /v1/turn and /v1/feedback
+#   CARTESIA_API_KEY    Cartesia TTS API key used for /v1/tts (optional —
+#                        if unset, /v1/tts returns 501 and the app falls
+#                        back to on-device TTS)
+#
+#   wrangler secret put ANTHROPIC_API_KEY
+#   wrangler secret put CARTESIA_API_KEY
+# ---------------------------------------------------------------------------
+
+[vars]
+# Non-secret config. CORS origin(s) allowed to call this Worker — tighten
+# before shipping (SPEC.md §3: "CORS locked to app").
+ALLOWED_ORIGIN = "*"
+
+# ---------------------------------------------------------------------------
+# KV namespace for per-device rate limiting (SPEC.md §3, §4).
+# Placeholder id below — replace after running:
+#   wrangler kv namespace create RATE_LIMIT
+# and pasting the returned id here (and a second one for `preview_id` from
+# `wrangler kv namespace create RATE_LIMIT --preview` for local dev).
+# ---------------------------------------------------------------------------
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+preview_id = "REPLACE_WITH_KV_PREVIEW_NAMESPACE_ID"
