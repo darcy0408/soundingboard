@@ -1,0 +1,10 @@
+﻿node_modules/
+.expo/
+dist/
+*.log
+.env
+.env.*
+.dev.vars
+.wrangler/
+ios/
+android/
