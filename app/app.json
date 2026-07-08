@@ -8,7 +8,12 @@
     "scheme": "soundingboard",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.darcy.soundingboard",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "SoundingBoard uses the microphone and speech recognition to let you practice conversations out loud. Audio is transcribed on your device.",
+        "NSSpeechRecognitionUsageDescription": "SoundingBoard uses the microphone and speech recognition to let you practice conversations out loud. Audio is transcribed on your device."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -32,7 +37,19 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      "expo-audio",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "SoundingBoard uses the microphone and speech recognition to let you practice conversations out loud. Audio is transcribed on your device.",
+          "speechRecognitionPermission": "SoundingBoard uses the microphone and speech recognition to let you practice conversations out loud. Audio is transcribed on your device.",
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox"
+          ]
+        }
+      ],
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,

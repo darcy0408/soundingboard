@@ -1,5 +1,5 @@
 import { getDeviceId } from '@/lib/device-id';
-import type { ChatMessage, FeedbackResult, PersonaConfig, SessionMode } from '@/lib/types';
+import type { ChatMessage, FeedbackResult, PersonaConfig, SessionMode, Temperament } from '@/lib/types';
 import { useEntitlementStore } from '@/stores/entitlementStore';
 
 // Matches worker/src Worker contract in SPEC.md §3 — do not change endpoint shapes here without
@@ -103,4 +103,47 @@ export async function getFeedback(
     persona: config,
     messages,
   });
+}
+
+/**
+ * POST /v1/tts — returns raw MP3 bytes for `text` spoken in the voice mapped to `temperament`
+ * (worker/src/cartesia.ts TEMPERAMENT_VOICE_IDS), or throws ApiError. Unlike `post<T>()` above,
+ * the success response is binary (audio/mpeg), not JSON, so this doesn't reuse that helper.
+ *
+ * Callers should always catch ApiError here — the Worker returns 501 when no Cartesia key is
+ * configured (SPEC.md §3), and the contract is to fall back to on-device TTS (expo-speech) on any
+ * failure (501, network error, rate limit, upstream error), never to break the chat flow.
+ */
+export async function fetchTtsAudio(text: string, temperament: Temperament): Promise<Uint8Array> {
+  const deviceId = await getDeviceId();
+  const isEntitled = useEntitlementStore.getState().isPro;
+
+  let response: Response;
+  try {
+    response = await fetch(`${WORKER_URL}/v1/tts`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-device-id': deviceId,
+        'x-entitled': isEntitled ? 'true' : 'false',
+      },
+      body: JSON.stringify({ text, temperament }),
+    });
+  } catch {
+    throw new ApiError(0, "Couldn't reach the server for voice playback.");
+  }
+
+  if (!response.ok) {
+    let message = `TTS request failed (${response.status}).`;
+    try {
+      const data = (await response.json()) as { error?: string; message?: string };
+      if (data?.message) message = data.message;
+    } catch {
+      // Body wasn't JSON — fall back to the generic message above.
+    }
+    throw new ApiError(response.status, message);
+  }
+
+  const buffer = await response.arrayBuffer();
+  return new Uint8Array(buffer);
 }
