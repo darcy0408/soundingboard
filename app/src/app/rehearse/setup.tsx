@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   KeyboardAvoidingView,
@@ -18,6 +18,7 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { DIFFICULTIES, SCENARIO_CATEGORIES, SCENARIO_PRESETS, TEMPERAMENTS } from '@/lib/scenarios';
 import type { Difficulty, PersonaConfig, ScenarioCategory, Temperament } from '@/lib/types';
+import { useOnboardingStore } from '@/stores/onboardingStore';
 import { useSessionStore } from '@/stores/sessionStore';
 
 export default function RehearseSetup() {
@@ -25,6 +26,9 @@ export default function RehearseSetup() {
   const theme = useTheme();
   const params = useLocalSearchParams<{ fromVent?: string }>();
   const startSession = useSessionStore((s) => s.startSession);
+  // SPEC §5.1: no session may start before the AI-consent screen has been explicitly agreed to.
+  // Home already gates on this, but this screen is directly reachable (e.g. a deep link).
+  const onboardingCompleted = useOnboardingStore((s) => s.completed);
   const fromVent = params.fromVent === '1';
 
   const [category, setCategory] = useState<ScenarioCategory | null>(null);
@@ -38,6 +42,12 @@ export default function RehearseSetup() {
   );
   const [goal, setGoal] = useState('');
   const [difficulty, setDifficulty] = useState<Difficulty>(2);
+
+  // All hooks above must run unconditionally on every render (Rules of Hooks) — the redirect
+  // guard itself has to come after them.
+  if (!onboardingCompleted) {
+    return <Redirect href="/onboarding/welcome" />;
+  }
 
   const applyPreset = (
     presetId: string,

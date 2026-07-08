@@ -5,6 +5,10 @@ import type { ChatMessage, PersonaConfig, SessionMode } from '@/lib/types';
 
 export const TURN_CAP = 30;
 
+/** SPEC.md §6: once the free tier is exhausted (feedback reports gated), sessions are
+ *  additionally capped at 5 turns instead of the normal 30. */
+export const GATED_TURN_CAP = 5;
+
 export type SessionStatus = 'idle' | 'awaiting-reply' | 'error';
 
 interface SessionState {

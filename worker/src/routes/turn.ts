@@ -65,18 +65,21 @@ export async function handleTurn(c: Context<{ Bindings: Env }>): Promise<Respons
   }
 
   const userText = lastUserMessage(body.messages);
+
+  // Crisis pre-filter runs FIRST — safety takes priority over input validation,
+  // so an over-length message containing crisis language still gets the fixed
+  // safety response instead of a 413. Returns WITHOUT calling the model.
+  if (userText && containsCrisisLanguage(userText)) {
+    const res: TurnResponse = { reply: CRISIS_RESPONSE };
+    return c.json(res, 200);
+  }
+
   if (userText !== undefined && userText.length > MAX_USER_CONTENT_CHARS) {
     const err: ErrorResponse = {
       error: "content_too_large",
       message: `User message content exceeds ${MAX_USER_CONTENT_CHARS} characters.`,
     };
     return c.json(err, 413);
-  }
-
-  // Crisis pre-filter — return the fixed message WITHOUT calling the model.
-  if (userText && containsCrisisLanguage(userText)) {
-    const res: TurnResponse = { reply: CRISIS_RESPONSE };
-    return c.json(res, 200);
   }
 
   // Rate limit. SPEC.md §3: 40 turns/hour, 400/day free, 1200/day entitled.

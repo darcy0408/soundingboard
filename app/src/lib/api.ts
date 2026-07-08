@@ -4,7 +4,20 @@ import { useEntitlementStore } from '@/stores/entitlementStore';
 
 // Matches worker/src Worker contract in SPEC.md §3 — do not change endpoint shapes here without
 // checking the Worker implementation stays in sync.
-const WORKER_URL = process.env.EXPO_PUBLIC_WORKER_URL ?? 'http://localhost:8787';
+// The localhost fallback exists for dev only. Release builds must set EXPO_PUBLIC_WORKER_URL
+// (EAS env var / eas.json env block) — an unset value in a release build fails loudly below
+// instead of silently shipping a build pointed at localhost.
+const WORKER_URL = process.env.EXPO_PUBLIC_WORKER_URL ?? (__DEV__ ? 'http://localhost:8787' : '');
+
+function requireWorkerUrl(): string {
+  if (!WORKER_URL) {
+    throw new ApiError(
+      0,
+      'This build is missing its server address (EXPO_PUBLIC_WORKER_URL). Please update the app.',
+    );
+  }
+  return WORKER_URL;
+}
 
 /** Server-side guard is authoritative (SPEC §3); this mirrors it so we can fail fast client-side. */
 export const MAX_TURN_CHARS = 4000;
@@ -27,7 +40,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 
   let response: Response;
   try {
-    response = await fetch(`${WORKER_URL}${path}`, {
+    response = await fetch(`${requireWorkerUrl()}${path}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -120,7 +133,7 @@ export async function fetchTtsAudio(text: string, temperament: Temperament): Pro
 
   let response: Response;
   try {
-    response = await fetch(`${WORKER_URL}/v1/tts`, {
+    response = await fetch(`${requireWorkerUrl()}/v1/tts`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

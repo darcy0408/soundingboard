@@ -21,7 +21,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { ApiError, MAX_TURN_CHARS, getFeedback, sendTurn } from '@/lib/api';
 import { VENT_TTS_TEMPERAMENT, speakReply, stopSpokenReply } from '@/lib/tts';
 import type { SessionRecord } from '@/lib/types';
-import { TURN_CAP, useSessionStore } from '@/stores/sessionStore';
+import { GATED_TURN_CAP, TURN_CAP, useSessionStore } from '@/stores/sessionStore';
 import { useEntitlementStore } from '@/stores/entitlementStore';
 import { useHistoryStore } from '@/stores/historyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -139,7 +139,10 @@ export default function Session() {
   const sessionMode = mode;
 
   const userTurnCount = messages.filter((m) => m.role === 'user').length;
-  const isCapped = turnIndex >= TURN_CAP;
+  // SPEC §6: past the free-tier limit (feedback reports gated), sessions are capped at 5 turns
+  // instead of the normal 30 — otherwise a gated user gets a nearly-full-length session for free.
+  const effectiveTurnCap = isGated ? GATED_TURN_CAP : TURN_CAP;
+  const isCapped = turnIndex >= effectiveTurnCap;
   const awaitingReply = status === 'awaiting-reply';
   const headerTitle = sessionMode === 'rehearse' ? config?.name || 'Rehearse' : 'Vent';
   const endLabel = sessionMode === 'rehearse' ? 'End & get feedback' : 'Done';
@@ -158,10 +161,15 @@ export default function Session() {
     setDraft('');
     appendUserMessage(text);
     setStatus('awaiting-reply');
-    const nextTurnIndex = incrementTurn();
+    // Compute the tentative turn_index but don't commit it to the store until the request
+    // actually succeeds (see incrementTurn() call below) — committing unconditionally here would
+    // let turnIndex drift ahead of the real number of completed persona turns on every failed
+    // send, which throws off both the every-8th-turn reminder cadence (SPEC §3) and the turn cap.
+    const nextTurnIndex = turnIndex + 1;
 
     try {
       const reply = await sendTurn(config, outgoing, nextTurnIndex, sessionMode);
+      incrementTurn();
       appendAssistantMessage(reply);
       setStatus('idle');
       if (voiceEnabled) {
