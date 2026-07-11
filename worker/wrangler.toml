@@ -28,5 +28,5 @@ ALLOWED_ORIGIN = "*"
 # ---------------------------------------------------------------------------
 [[kv_namespaces]]
 binding = "RATE_LIMIT"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
-preview_id = "REPLACE_WITH_KV_PREVIEW_NAMESPACE_ID"
+id = "3ead3f38cd444dbe8b60596a7efdf9d3"
+preview_id = "b330ba1ac3a544d59f6b262d2cccc0d4"
