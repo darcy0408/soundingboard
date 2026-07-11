@@ -8,6 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { AI_CONSENT_TEXT, DISCLAIMER_TEXT } from '@/lib/copy';
+import { restorePurchases } from '@/lib/purchases';
 import { useEntitlementStore } from '@/stores/entitlementStore';
 import { useHistoryStore } from '@/stores/historyStore';
 import { useOnboardingStore } from '@/stores/onboardingStore';
@@ -18,6 +19,20 @@ export default function Settings() {
   const clearHistory = useHistoryStore((s) => s.clearAll);
   const resetEntitlement = useEntitlementStore((s) => s.reset);
   const resetOnboarding = useOnboardingStore((s) => s.reset);
+
+  const handleRestore = async () => {
+    try {
+      const isPro = await restorePurchases();
+      Alert.alert(
+        isPro ? 'Restored' : 'Nothing to restore',
+        isPro
+          ? 'Your subscription is active on this device.'
+          : "We didn't find an active subscription for this Apple ID."
+      );
+    } catch {
+      Alert.alert('Restore failed', "Couldn't reach the App Store. Try again in a moment.");
+    }
+  };
 
   const confirmDelete = () => {
     Alert.alert(
@@ -61,12 +76,7 @@ export default function Settings() {
       </Section>
 
       <Section title="Account">
-        <Row
-          label="Restore Purchases"
-          onPress={() =>
-            Alert.alert('Restore Purchases', 'Coming soon — subscriptions ship in a later phase.')
-          }
-        />
+        <Row label="Restore Purchases" onPress={handleRestore} />
         <Row
           label="Privacy Policy"
           onPress={() =>

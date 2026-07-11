@@ -115,3 +115,38 @@ phase added: `expo-audio`, `expo-speech-recognition`, `expo-dev-client`). For pu
 Use the `preview` profile the same way (`npx eas build --profile preview --platform ios`) once
 RevenueCat/paywall work lands in P2, to test a build without the dev-client debug menu overlay.
 `production` is for the eventual TestFlight/App Store submission in P3.
+
+## Monetization setup (RevenueCat, SPEC.md §6)
+
+The `react-native-purchases` wiring (`src/lib/purchases.ts`, `app/paywall.tsx`, `app/settings.tsx`'s
+Restore Purchases) is code-complete but **inert without a RevenueCat project** — `initPurchases()`
+no-ops when `EXPO_PUBLIC_REVENUECAT_IOS_API_KEY` is unset, so the app runs fine today with the
+`__DEV__`-only manual Pro toggle on the paywall screen standing in for real purchases.
+
+To make it real:
+
+1. Create products `sb_monthly_999` ($9.99/mo) and `sb_annual_4999` ($49.99/yr) in **App Store
+   Connect** (needs an active Apple Developer account) — In-App Purchases / Subscriptions section
+   of the app record.
+2. Create a free [RevenueCat](https://app.revenuecat.com) account and project, connect it to the
+   App Store Connect app (RevenueCat's setup flow walks through the App Store Connect API key
+   sharing step), and import the two products.
+3. In the RevenueCat dashboard, create an **entitlement** and attach both products to it. The
+   entitlement identifier must be `pro` — that's hardcoded as `PRO_ENTITLEMENT_ID` in
+   `src/lib/purchases.ts`. (If you'd rather name it something else in the dashboard, update that
+   constant to match instead.)
+4. Create an **offering** with a `monthly` and `annual` package (RevenueCat's standard
+   duration-based package types — `src/lib/purchases.ts` reads `offering.monthly`/`.annual`, not
+   product identifiers) and mark it current.
+5. Copy the **Apple App Store public API key** from RevenueCat's dashboard (Project Settings > API
+   Keys) into `EXPO_PUBLIC_REVENUECAT_IOS_API_KEY` — in `app/.env.local` for local dev-client runs
+   (step 4 of "Running on device" above), and in `eas.json`'s `env` block (or `eas env:create`) for
+   `preview`/`production` builds, since those bundle the JS at build time rather than serving it
+   live from your PC.
+6. **`react-native-purchases` is a native module** — since it was added after any dev-client build
+   you may already have, you need a fresh `npx eas build --profile development --platform ios` for
+   it to actually be present on the installed dev client. (If this is your first-ever build, no
+   extra step — it's included from the start.)
+7. Testing a real purchase needs a **Sandbox Tester** Apple ID (App Store Connect > Users and
+   Access > Sandbox Testers), signed into the *Sandbox* Apple ID slot in iOS Settings on the test
+   device, not the device's real Apple ID.

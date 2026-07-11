@@ -5,6 +5,7 @@ import { useColorScheme } from 'react-native';
 
 import { useOnboardingStore } from '@/stores/onboardingStore';
 import { useTheme } from '@/hooks/use-theme';
+import { initPurchases } from '@/lib/purchases';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -12,6 +13,10 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const theme = useTheme();
   const hasHydrated = useOnboardingStore((s) => s.hasHydrated);
+
+  useEffect(() => {
+    initPurchases();
+  }, []);
 
   useEffect(() => {
     if (hasHydrated) {

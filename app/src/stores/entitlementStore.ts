@@ -2,8 +2,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-// Stub entitlement store for P0/P1. RevenueCat wiring happens in P2 (SPEC §8) — this exists so the
-// gate at end-of-session (SPEC §6) can be built and tested end-to-end before RevenueCat lands.
+// isPro is synced from RevenueCat CustomerInfo by src/lib/purchases.ts (SPEC §6, P2) via setPro,
+// and persisted here so the last-known entitlement survives app restarts/offline launches between
+// syncs. freeSessionsUsed/isGated are independent of RevenueCat — they track the free-tier session
+// count (SPEC §6) regardless of subscription status.
 const FREE_SESSION_LIMIT = 3;
 
 interface EntitlementState {
