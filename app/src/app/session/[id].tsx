@@ -18,7 +18,7 @@ import { Button } from '@/components/button';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { ApiError, MAX_TURN_CHARS, getFeedback, sendTurn } from '@/lib/api';
+import { ApiError, MAX_TURN_CHARS, getFeedback, sendReport, sendTurn } from '@/lib/api';
 import { VENT_TTS_TEMPERAMENT, speakReply, stopSpokenReply } from '@/lib/tts';
 import type { SessionRecord } from '@/lib/types';
 import { GATED_TURN_CAP, TURN_CAP, useSessionStore } from '@/stores/sessionStore';
@@ -36,11 +36,16 @@ export default function Session() {
   const [endingBusy, setEndingBusy] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState('');
+  // Indexes into `messages` of AI replies the user has reported this session (P-1 in
+  // store/play-compliance.md). Session-local on purpose — reports are fire-and-forget.
+  const [reportedIndexes, setReportedIndexes] = useState<Set<number>>(new Set());
   const finalTranscriptRef = useRef('');
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   const voiceEnabled = useSettingsStore((s) => s.voiceEnabled);
   const setVoiceEnabled = useSettingsStore((s) => s.setVoiceEnabled);
+  const micDisclosureAccepted = useSettingsStore((s) => s.micDisclosureAccepted);
+  const setMicDisclosureAccepted = useSettingsStore((s) => s.setMicDisclosureAccepted);
 
   const id = useSessionStore((s) => s.id);
   const mode = useSessionStore((s) => s.mode);
@@ -192,9 +197,40 @@ export default function Session() {
     void sendMessage(draft.trim());
   }
 
-  async function handleMicPressIn() {
-    if (awaitingReply || isCapped || endingBusy || isRecording) return;
+  /** Report an AI reply for moderation review (store/play-compliance.md P-1). The confirm
+   *  dialog is also the user's consent to send the turns leading up to the flagged reply. */
+  function handleReportMessage(index: number) {
+    const target = messages[index];
+    if (!target || target.role !== 'assistant' || reportedIndexes.has(index)) return;
+    Alert.alert(
+      'Report this response?',
+      'This sends the flagged response and the messages just before it to us for review. Your session continues as normal.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Report',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              try {
+                const context = messages.slice(Math.max(0, index - 5), index);
+                await sendReport(sessionMode, target.content, context);
+                setReportedIndexes((prev) => new Set(prev).add(index));
+              } catch (err) {
+                const message =
+                  err instanceof ApiError ? err.message : "Couldn't send the report. Try again.";
+                Alert.alert("Couldn't send the report", message);
+              }
+            })();
+          },
+        },
+      ]
+    );
+  }
 
+  /** Requests mic + speech permission, alerting on denial/unavailability. Returns whether
+   *  recording may proceed. */
+  async function ensureMicPermission(): Promise<boolean> {
     try {
       const permission = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
       if (!permission.granted) {
@@ -203,8 +239,9 @@ export default function Session() {
           'SoundingBoard needs microphone and speech recognition access for push-to-talk. You can still type your side of the conversation.',
           [{ text: 'Use typing instead', style: 'cancel' }]
         );
-        return;
+        return false;
       }
+      return true;
     } catch {
       // Most likely the native module isn't available — expo-speech-recognition requires an EAS
       // development build and does not work inside Expo Go (SPEC §2).
@@ -213,8 +250,35 @@ export default function Session() {
         "Push-to-talk needs a development build — it doesn't work in Expo Go. Type your message instead.",
         [{ text: 'OK', style: 'cancel' }]
       );
+      return false;
+    }
+  }
+
+  async function handleMicPressIn() {
+    if (awaitingReply || isCapped || endingBusy || isRecording) return;
+
+    // Google Play's prominent-disclosure rule (store/play-compliance.md P-5): an in-app
+    // disclosure with affirmative accept must come BEFORE the OS mic permission prompt.
+    // Accepting fires the OS prompt right away; the user then holds the mic again to talk.
+    if (!micDisclosureAccepted) {
+      Alert.alert(
+        'Using your microphone',
+        'SoundingBoard uses the microphone to transcribe your side of the conversation, on your device. Audio is never uploaded — only the text transcript is sent to generate replies. You can always type instead.',
+        [
+          { text: 'Not now', style: 'cancel' },
+          {
+            text: 'Continue',
+            onPress: () => {
+              setMicDisclosureAccepted(true);
+              void ensureMicPermission();
+            },
+          },
+        ]
+      );
       return;
     }
+
+    if (!(await ensureMicPermission())) return;
 
     finalTranscriptRef.current = '';
     setInterimTranscript('');
@@ -349,7 +413,15 @@ export default function Session() {
               </ThemedText>
             )}
             {messages.map((message, index) => (
-              <Bubble key={index} role={message.role} content={message.content} />
+              <Bubble
+                key={index}
+                role={message.role}
+                content={message.content}
+                reported={reportedIndexes.has(index)}
+                onReport={
+                  message.role === 'assistant' ? () => handleReportMessage(index) : undefined
+                }
+              />
             ))}
             {awaitingReply && <TypingBubble />}
           </ScrollView>
@@ -459,7 +531,17 @@ export default function Session() {
   );
 }
 
-function Bubble({ role, content }: { role: 'user' | 'assistant'; content: string }) {
+function Bubble({
+  role,
+  content,
+  reported,
+  onReport,
+}: {
+  role: 'user' | 'assistant';
+  content: string;
+  reported?: boolean;
+  onReport?: () => void;
+}) {
   const theme = useTheme();
   const isUser = role === 'user';
   return (
@@ -477,6 +559,26 @@ function Bubble({ role, content }: { role: 'user' | 'assistant'; content: string
           {content}
         </ThemedText>
       </View>
+      {/* In-app "report this response" control on every AI reply — Google Play AI-content
+          policy requirement (store/play-compliance.md P-1). Ships on iOS too for parity. */}
+      {!isUser &&
+        onReport &&
+        (reported ? (
+          <ThemedText type="small" themeColor="textSecondary" style={styles.reportFlag}>
+            Reported
+          </ThemedText>
+        ) : (
+          <Pressable
+            onPress={onReport}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Report this response"
+            style={styles.reportFlag}>
+            <ThemedText type="small" themeColor="textSecondary">
+              ⚑
+            </ThemedText>
+          </Pressable>
+        ))}
     </View>
   );
 }
@@ -526,6 +628,12 @@ const styles = StyleSheet.create({
   bubbleRow: {
     flexDirection: 'row',
     justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+  },
+  reportFlag: {
+    marginLeft: Spacing.one,
+    paddingBottom: 2,
+    opacity: 0.6,
   },
   bubbleRowUser: {
     justifyContent: 'flex-end',

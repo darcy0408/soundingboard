@@ -72,6 +72,17 @@ export interface TtsRequest {
   temperament: Temperament;
 }
 
+/** POST /v1/report — user-flagged AI content for moderation review
+ *  (Google Play AI-content policy; store/play-compliance.md P-1). */
+export interface ReportRequest {
+  mode: Mode;
+  /** The AI reply being reported. */
+  reported_message: string;
+  /** Turns leading up to the reported reply — sent with the user's explicit consent. */
+  context_messages?: ChatMessage[];
+  reason?: string;
+}
+
 export interface ErrorResponse {
   error: string;
   message: string;

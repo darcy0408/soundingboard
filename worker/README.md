@@ -22,6 +22,7 @@ worker/
       turn.ts POST /v1/turn
       feedback.ts POST /v1/feedback
       tts.ts POST /v1/tts
+      report.ts POST /v1/report
   scripts/
     extract-prompts.mjs       Generates prompts.generated.ts from ../prompts/*.md
     persona-stress-test.ts    SPEC.md §10 kill-criterion gate (needs ANTHROPIC_API_KEY)
@@ -115,6 +116,25 @@ app").
 | `POST /v1/turn` | `{mode, persona, messages, turn_index}` → `{reply}`. Crisis pre-filter and rate limit run before any model call. Persona reminder is injected into the last user message every 8th turn (rehearse mode only). |
 | `POST /v1/feedback` | `{persona, messages}` → parsed `FEEDBACK_SCHEMA` JSON, moments truncated to 3 defensively. |
 | `POST /v1/tts` | `{text, temperament}` → `audio/mpeg` stream, or `501 {error:"tts_unavailable"}` if `CARTESIA_API_KEY` is unset (app should fall back to on-device TTS). |
+| `POST /v1/report` | `{mode, reported_message, context_messages?, reason?}` → `{ok:true}`. User-flagged AI content for moderation (Google Play AI-content policy — `store/play-compliance.md` P-1). Stored in the `RATE_LIMIT` KV namespace under `report:`-prefixed keys, 90-day TTL, capped at 20 reports/device/day. |
+
+## Moderation review (reports)
+
+Play's AI-content policy requires reports to feed human moderation. Reports
+live in the same KV namespace as the rate limiter, under `report:{ISO
+timestamp}:{uuid}` keys (chronological when sorted), and expire after 90
+days. To review, periodically run:
+
+```
+npx wrangler kv key list --binding RATE_LIMIT --prefix "report:" --remote
+npx wrangler kv key get --binding RATE_LIMIT --remote "<key from the list>"
+```
+
+Each value is JSON: `{ts, deviceId, mode, reported_message,
+context_messages, reason}`. The content is user-consented (the app's confirm
+dialog states what gets sent). If a report shows the persona generating
+content the prompts forbid, escalate to the planning model — the prompts are
+the fix surface, not the Worker.
 
 ## Rate limiting header contract
 

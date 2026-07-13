@@ -119,6 +119,23 @@ export async function getFeedback(
 }
 
 /**
+ * POST /v1/report — sends a user-flagged AI reply (plus the turns just before it, with the
+ * user's explicit consent via the confirm dialog) to the Worker's moderation log. Required by
+ * Google Play's AI-Generated Content policy — see store/play-compliance.md P-1.
+ */
+export async function sendReport(
+  mode: SessionMode,
+  reportedMessage: string,
+  contextMessages: ChatMessage[]
+): Promise<void> {
+  await post<{ ok: boolean }>('/v1/report', {
+    mode,
+    reported_message: reportedMessage,
+    context_messages: contextMessages,
+  });
+}
+
+/**
  * POST /v1/tts — returns raw MP3 bytes for `text` spoken in the voice mapped to `temperament`
  * (worker/src/cartesia.ts TEMPERAMENT_VOICE_IDS), or throws ApiError. Unlike `post<T>()` above,
  * the success response is binary (audio/mpeg), not JSON, so this doesn't reuse that helper.
