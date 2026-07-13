@@ -1,5 +1,38 @@
 # Session notes
 
+## 2026-07-13 — Android emulator smoke test attempted (blocked); Play compliance doc landed; session closed out
+
+**Done:**
+- Ran the first real Android build end-to-end (`expo run:android` against a local Android Studio emulator): Gradle build succeeded (~8.5 min), the debug APK installed, Metro bundled the JS, and the app launched showing the correct onboarding value-prop screen and copy.
+- Attempted the full golden-path smoke test (onboarding → consent → scenario setup → a session turn → feedback) via `adb` screenshot-and-tap automation. Got blocked immediately after launch by a recurring "System UI isn't responding" dialog from the emulator itself — confirmed across several attempts (with wait times up to 12 seconds between retries) that this is an Android System UI process issue, not an app crash: the app's own rendered content (headline/subhead copy) was correct and legible underneath the dialog every time. Could not get past onboarding as a result — the rest of the golden path is still unverified on Android.
+- The user closed the emulator mid-troubleshoot; no Android device or emulator was reattached before this session closed, so the smoke test remains incomplete.
+- Found that a concurrent session had, in parallel, completed the `SPEC.md` §5.7 Google Play compliance research and committed it (`bf20d88` — `store/play-compliance.md`, a 9-item work list P-1 through P-9 covering an in-app content-report control, avoiding Play's Health-app classification, the Data Safety form, a mic pre-disclosure screen, target SDK 36, age-signal gating, and the IARC questionnaire). This closes that specific "Next" item from the previous entry below — no action needed on the research itself, but none of P-1 through P-9 have been implemented yet.
+- Re-verified before closing: `tsc --noEmit` clean in both `app/` and `worker/`, `expo lint` clean in `app/`, 65/65 `worker` vitest tests passing.
+- Deleted six untracked debug screenshots (`scratch_screen1.png`–`scratch_screen6.png`) generated during the smoke-test attempt — throwaway diagnostic captures, not project assets.
+
+**Decisions:**
+- None new this session — this pass was build/test verification and closing out work already completed (by this session and a concurrent one), not new product or architecture decisions.
+
+**Next:**
+1. **Android — unblock the emulator smoke test.** Retry `expo run:android` with a fresh emulator boot (the ANR may be a one-off resource spike right after the first heavy Gradle build) or switch straight to the physical Android device the user has available — either is simpler than continuing to fight the same emulator instance. Once past onboarding, walk consent → scenario setup → a session turn → feedback.
+2. **Android — verify speech-to-text actually works.** Still the single biggest unknown, unchanged from the prior entry — this is now load-bearing since Android ships in v1.
+3. **Implement `store/play-compliance.md`'s P-1 through P-9** before any Play Store submission. The substantial one is P-1 (in-app "report this response" control + a new Worker endpoint), which the doc recommends shipping on iOS too.
+4. iOS track unchanged: buy an iPhone (iOS 16.4+, iPhone 11 or newer recommended), confirm Apple Developer Program membership, then `eas build --profile development --platform ios` and the device checklist in `app/README.md`.
+5. Before any store submission (either platform): tighten `ALLOWED_ORIGIN` in `worker/wrangler.toml` (still `"*"`), and publish `store/privacy-policy.md` at a public URL.
+6. Decide on a paid voice provider per the prior entry's item 4 — unchanged, not urgent, since the on-device fallback ships fine without it.
+
+**Blocked on user:**
+- Reattaching an Android device or emulator to finish the smoke test — the only thing strictly blocking further Android progress right now.
+- iPhone purchase and Apple Developer Program membership (unchanged, longstanding).
+- RevenueCat account/project setup, needed for both platforms.
+- Decision on a paid TTS provider (not required to ship v1).
+
+**Risks/unverified:**
+- Android's golden path beyond onboarding (setup → session → feedback) is still unverified end-to-end.
+- Android speech-to-text is completely unverified (unchanged from the prior entry) and is now load-bearing since Android ships in v1.
+- The emulator ANR's root cause is unconfirmed — plausibly a resource-contention artifact from the first heavy build, but not ruled out as anything else.
+- `store/play-compliance.md`'s P-1 (in-app report control) is net-new scope, not yet built — easy to miss as "just paperwork" since most of the rest of that doc is copy/console-form work.
+
 ## 2026-07-13 — Android brought into v1 scope (committed); TTS/voice cost decisions; no code written
 
 **Done:**
