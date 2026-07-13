@@ -85,7 +85,7 @@ onboarding: 2 screens — value prop, then the AI-consent screen (below).
 4. Category: **Productivity**. Age rating: answer the questionnaire honestly per feature; target 12+; nothing in prompts may generate content that forces higher.
 5. No persistent cross-session AI memory of the user's personal life (companion-pattern risk + privacy). Each session starts fresh; "Practice again" re-uses the setup config only.
 6. 4.3(b) defense = feature depth: scenario library, persona setup, difficulty levels, scored feedback reports. Never a bare chat screen.
-7. **Google Play (Android) — not yet researched, blocking before any Play Store submission:** the six rules above are Apple App Store specific. Before submitting to Play, a real research pass is needed for Play's Data Safety form, content-rating (IARC) questionnaire, and any sensitive-app policies that could apply to an AI-conversation app. Do not assume Apple's rules translate directly. Local dev/sideload builds and testing are unaffected by this gap.
+7. **Google Play (Android) — researched 2026-07-13, work list in `store/play-compliance.md`:** the six rules above are Apple App Store specific. The Play-side items (P-1…P-9) in `store/play-compliance.md` are binding for any Play submission; P-1 (in-app "report this response" control) is the only net-new feature and hard-blocks submission. Do not assume Apple's rules translate directly. Local dev/sideload builds and testing are unaffected.
 
 ## 6. Monetization
 
