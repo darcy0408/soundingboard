@@ -1,5 +1,43 @@
 # Session notes
 
+## 2026-07-13 — Android brought into v1 scope (committed); TTS/voice cost decisions; no code written
+
+**Done:**
+- Committed the Android scope expansion that was sitting uncommitted in the working tree (`b81f3a8`). These edits were authored by the user on 2026-07-12, not by this session — this session verified and committed them. They cover: `SPEC.md` §9 (Android removed from the binding cut list, now ships as a second v1 platform — explicitly the user's call), `SPEC.md` §5.7 (new — flags that Google Play compliance is *not researched* and blocks any Play submission), `SPEC.md` §6 (Android RevenueCat will need its own Play Console product IDs and an `EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY`), `CLAUDE.md` (scope-discipline rule updated to match), `app/app.json` (Android package id `com.darcy.soundingboard`), and `app/package.json` (the `android`/`ios` scripts changed from `expo start --*` to `expo run:*`, because the speech-recognition and purchases native modules require a real native build).
+- Verified before committing: `tsc --noEmit` clean in `app/`, `tsc --noEmit` clean in `worker/`, and 65/65 vitest tests passing in `worker/`.
+- Established the true cost picture for the app, which corrects a common wrong assumption (that the AI model is the expensive part). It is not. Per `SPEC.md` §7 and current Anthropic pricing (`claude-haiku-4-5` = $1 per million input tokens / $5 per million output tokens, already the cheapest model in the Claude lineup — Sonnet and Opus are 3–5× more): the language model costs roughly **$0.03 per 10-minute session**, while Cartesia text-to-speech costs roughly **$0.30 per session — about 10× more**. Any cost optimization should target text-to-speech, not the model.
+- Confirmed by reading `worker/src/routes/tts.ts` that **text-to-speech is already optional and already has a free path**. If the `CARTESIA_API_KEY` Worker secret is unset, the `/v1/tts` endpoint returns `501 tts_unavailable` and the app falls back to the phone's built-in voice via `expo-speech` — which costs nothing. No paid voice provider is required to ship.
+- Discovered from the user's untracked debug screenshots (`scratch_screen1.png` through `scratch_screen6.png`, still untracked in the repo root) that **the app already launches and renders its onboarding screen on an Android emulator** (Expo SDK 57 dev build). However, the emulator threw a `"System UI isn't responding"` dialog over the app. Unresolved — see Risks.
+- Did **not** run the `SPEC.md` §10 kill-criterion persona stress test this session. It turned out to have already been run and cleared in the 2026-07-11 session (see the entry below); this session began from a stale view of the repo and only discovered that later. No action needed — the gate is passed.
+- No application code was written or changed this session.
+
+**Decisions:**
+- **Do not pay for a text-to-speech provider yet; ship v1 on the free on-device voice (`expo-speech`).** *Why:* it is already wired as the fallback, it costs nothing, it carries no licensing restrictions, and text-to-speech is the single largest cost in the app (~10× the language model). Shipping without it removes a paid dependency and an account setup from the launch path. *How to apply:* simply leave the `CARTESIA_API_KEY` Worker secret unset — the Worker and app already handle this correctly. Revisit only after auditioning paid voices (see Next).
+- **Keep the model as `claude-haiku-4-5`.** *Why:* the user asked whether a cheaper API exists. Haiku 4.5 is already the cheapest Claude model, and the model is not the cost driver. Switching to a weaker or different provider would also risk the persona-pushback quality that `SPEC.md` §1 calls "the entire product," and would invalidate the already-passed stress-test gate. *How to apply:* unchanged from spec — do not change the model without planning-model sign-off (`SPEC.md` §10).
+- **Recorded, for whoever evaluates voice later:** the Worker's text-to-speech proxy is written specifically against Cartesia's API (`worker/src/cartesia.ts` + `worker/src/routes/tts.ts` hardcode Cartesia's endpoint, its `Authorization: Bearer` header, its request body shape, and its voice-ID format). Switching to ElevenLabs or any other provider is therefore **a rewrite of that one route, not a key swap** — a different endpoint, a different auth header (`xi-api-key` for ElevenLabs), a different body, and a different voice library. Budget real work for it, not a config change.
+
+**Next:**
+1. **Android — fix the emulator launch.** The app renders onboarding but the emulator shows `"System UI isn't responding"`. Determine whether this is an underpowered-emulator artifact (common, and often fixed by giving the emulator more RAM/CPU or enabling hardware acceleration) or a genuine app problem, then get past onboarding and through a full session.
+2. **Android — verify speech-to-text actually works.** This is now the biggest Android unknown; see Risks.
+3. **Research Google Play compliance** — `SPEC.md` §5.7. Play's Data Safety form, IARC content-rating questionnaire, and sensitive-app policies for an AI-conversation app. This is *blocking* for any Play Store submission and none of Apple's existing compliance work carries over.
+4. **Decide on voice quality** before spending anything: audition the same persona line in the ElevenLabs playground (the user has free credits), at `play.cartesia.ai`, and against the iPhone/Android system voice. The real tradeoff is not "robotic vs. human" — modern system voices sound fine but are *emotionally flat*, and cannot make a persona sound angry, cold, or guilt-tripping. Only pay for a provider if that emotional delivery proves worth it.
+5. **iOS track (unchanged, blocked on hardware):** buy an iPhone (iOS 16.4+, iPhone 11 or newer recommended), then `npx eas build --profile development --platform ios` and work through the 11-step device checklist in `app/README.md`.
+6. **Before any store submission (either platform):** tighten `ALLOWED_ORIGIN` in `worker/wrangler.toml` (still `"*"`), and publish `store/privacy-policy.md` at a public URL.
+7. **Housekeeping:** the six `scratch_screen*.png` files in the repo root are untracked debug screenshots from the Android emulator session. Delete them or add them to `.gitignore` — they should not be committed.
+
+**Blocked on user:**
+- Buying an iPhone for iOS device testing, and confirming Apple Developer Program membership ($99/yr) — both still outstanding from the previous session; `eas build` will fail without the latter.
+- RevenueCat account and project setup (now needed for *both* platforms: an iOS key and a separate Android/Play key).
+- Deciding whether a paid voice provider is wanted at all (see Next item 4). No account is needed unless the answer is yes.
+
+**Risks/unverified:**
+- **Speech-to-text on Android is completely unverified and is now load-bearing.** `SPEC.md` §2 describes `expo-speech-recognition` as wrapping iOS's `SFSpeechRecognizer`. Whether the installed version (`expo-speech-recognition@56.0.1`) supports Android at all, and how well, has never been checked. Since push-to-talk is the app's primary input method and Android is now a shipping platform, a future session must verify this early — do not assume it works.
+- The Android `"System UI isn't responding"` emulator error is unexplained. It may be an emulator resource artifact rather than an app bug, but that has not been established either way.
+- Google Play compliance is entirely unresearched (`SPEC.md` §5.7) — treat any assumption that Apple's rules carry over as unsafe.
+- `expo-speech-recognition` still has **zero real-device verification on iOS** as well (unchanged from previous sessions) — the app has only ever run on an Android emulator.
+- `app/src/lib/purchases.ts` typechecks but has never run against a real RevenueCat project (unchanged from the previous session).
+- Cartesia's API shape and voice IDs in `worker/src/cartesia.ts` remain placeholders and are unverified against a live account (unchanged). Irrelevant while shipping with on-device voice.
+
 ## 2026-07-11 — Worker deployed to production; kill-criterion gate cleared; P2 RevenueCat/paywall built
 
 **Done:**
