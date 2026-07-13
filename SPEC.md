@@ -85,12 +85,14 @@ onboarding: 2 screens — value prop, then the AI-consent screen (below).
 4. Category: **Productivity**. Age rating: answer the questionnaire honestly per feature; target 12+; nothing in prompts may generate content that forces higher.
 5. No persistent cross-session AI memory of the user's personal life (companion-pattern risk + privacy). Each session starts fresh; "Practice again" re-uses the setup config only.
 6. 4.3(b) defense = feature depth: scenario library, persona setup, difficulty levels, scored feedback reports. Never a bare chat screen.
+7. **Google Play (Android) — not yet researched, blocking before any Play Store submission:** the six rules above are Apple App Store specific. Before submitting to Play, a real research pass is needed for Play's Data Safety form, content-rating (IARC) questionnaire, and any sensitive-app policies that could apply to an AI-conversation app. Do not assume Apple's rules translate directly. Local dev/sideload builds and testing are unaffected by this gap.
 
 ## 6. Monetization
 
 - RevenueCat (`react-native-purchases`). Products: `sb_monthly_999` ($9.99/mo), `sb_annual_4999` ($49.99/yr, badge "save 58%"). 
 - Free tier: 3 full sessions (either mode), then feedback reports gated + session cap 5 turns. Paywall shows after 3rd session ends and from any gate.
 - Paywall copy leads with the outcome ("Walk in prepared"), not the tech. No trial in v1 (validation: episodic users abuse trials); annual plan is the anchor.
+- **Android:** `react-native-purchases` already supports Google Play Billing, but this needs its own Play Console product IDs and a separate `EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY`, mirroring the existing iOS pattern in `app/src/lib/purchases.ts`. Not set up yet — tracked as a follow-up, same status as the still-unconfigured iOS RevenueCat project.
 
 ## 7. Cost model (validated 2026-07)
 
@@ -105,7 +107,9 @@ Per 10-min session (~15 persona turns): Haiku ~$0.03 uncached worst case, TTS ~$
 
 ## 9. Cut list (binding — do not build)
 
-No real-time full-duplex voice / WebRTC / barge-in. No accounts/auth. No Android. No cross-session AI memory. No community/sharing features. No human coaching. No streaks/gamification. No scenario marketplace. No push notifications in v1. No web app. No fake-call feature (separate idea, parked).
+No real-time full-duplex voice / WebRTC / barge-in. No accounts/auth. No cross-session AI memory. No community/sharing features. No human coaching. No streaks/gamification. No scenario marketplace. No push notifications in v1. No web app. No fake-call feature (separate idea, parked).
+
+**Android ships as a second v1 platform** (decision reversed 2026-07-12 — originally cut, now in scope; the user's explicit call, not an implementing-agent judgment). Worker and app code are shared as-is; no Worker changes were needed. Platform-specific store-compliance and monetization work is tracked separately and is *not yet done* — see §5 and §6.
 
 ## 10. Kill-criterion gate (before P2 spend)
 

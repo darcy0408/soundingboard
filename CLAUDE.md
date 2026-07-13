@@ -7,7 +7,7 @@ iOS app (Expo/React Native) for rehearsing difficult conversations with an AI pe
 - `C:\dev\ideas\soundingboard-VALIDATION.md` — market research behind the decisions. Don't re-litigate positioning; it's evidence-based.
 
 ## Ground rules for implementing agents
-- **Scope discipline:** build only what SPEC.md v1 defines. The cut list in SPEC.md §9 is binding — no real-time voice, accounts, Android, AI memory, or extra features.
+- **Scope discipline:** build only what SPEC.md v1 defines. The cut list in SPEC.md §9 is binding — no real-time voice, accounts, AI memory, or extra features. (Android is in scope as of 2026-07-12 — see SPEC.md §9.)
 - **Positioning is load-bearing:** this is *communication practice*, never therapy, emotional support, or an AI companion. The banned-words list in SPEC.md §5.3 applies to every string in the app and every line of store metadata.
 - **The prompts are the product.** `prompts/persona-system.md`, `prompts/vent-coach.md`, `prompts/feedback.md` are owned by the planning model. Wire them in with placeholder substitution only — never edit, paraphrase, shorten, or "improve" their content.
 - **No medical claims** anywhere. Use the disclaimer from SPEC.md §5.2 verbatim.
