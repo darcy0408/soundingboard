@@ -1,5 +1,34 @@
 # Session notes
 
+## 2026-07-13 — Play compliance P-1/P-5 implemented; Play Console prep doc written (concurrent session, verified and pushed)
+
+**Done:**
+- This entry covers work completed by a concurrent session (co-authored by Claude Opus 4.8) that landed two commits — `1cc9412` and `73ada12` — while this session was closing out. Verified independently before pushing rather than taking the commit messages on faith: `worker/` `tsc --noEmit` clean, 73/73 vitest tests passing (8 new), `app/` `tsc --noEmit` clean, `expo lint` clean.
+- **P-1 (in-app report control), from `store/play-compliance.md`:** new Worker endpoint `POST /v1/report` (`worker/src/routes/report.ts`) stores a user-flagged AI reply plus the few preceding messages in the existing `RATE_LIMIT` KV namespace under `report:` keys, 90-day TTL, capped at 20 reports/device/day, no content written to logs. The app (`app/src/app/session/[id].tsx`) now shows a flag control on every AI/coach bubble in-session, with a confirm dialog that states exactly what will be sent before it's sent. Ships on both iOS and Android. Review procedure for handling incoming reports is documented in `worker/README.md`.
+- **P-5 (mic prominent disclosure):** an in-app screen with an explicit accept/decline now runs before the OS `RECORD_AUDIO` permission prompt, gated through `app/src/stores/settingsStore.ts` so it only shows once.
+- **`store/privacy-policy.md` updated** to disclose the new report-storage exception (90-day retention, only on user-initiated report) and to become platform-neutral (Android speech recognition, Google Play billing alongside Apple's).
+- **New `store/play-console.md`** — the Play-specific counterpart to `store/metadata.md`: store listing copy, Data Safety form answers (backed by an explicit Worker-persistence audit, not guesswork), content declarations, IARC questionnaire guidance, and an ordered submission checklist. It also tracks live status of all nine `store/play-compliance.md` items (P-1 through P-9) — see table at the top of that file for what's built vs. open.
+- One item flagged inside `store/play-console.md` for the user's explicit sign-off, not yet decided: it recommends filing Play's IARC questionnaire as **18+**, which diverges from the **12+** target already set for the App Store in `SPEC.md` §5.4. The doc itself flags this as "the planning model's prescribed position" needing sign-off before submission — carrying that forward here so it isn't missed.
+
+**Decisions:**
+- None made by this closing session directly — the decisions above (90-day report retention, 18+ Play rating recommendation, staying out of Play's Health-app classification) were made by the concurrent session and are recorded in `store/play-compliance.md` and `store/play-console.md`. Flagging them here because they materially extend what SPEC.md's original "no server-side conversation storage" rule (§3) meant in practice — the report feature is a deliberate, narrow, user-consented exception, not a reversal of that rule.
+
+**Next:**
+1. **Darcy sign-off needed:** the 12+ (Apple) vs 18+ (Play) age-rating divergence noted above — read `store/play-console.md`'s IARC section and confirm or override before any Play submission.
+2. **Android — still unblocked from the prior entry:** get a device/emulator reattached and finish the golden-path smoke test (onboarding rendered correctly; nothing past it has been verified). Then verify Android speech-to-text actually works — still the single biggest unknown.
+3. **Play Age Signals API integration (P-7)** — explicitly deferred in `store/play-console.md`, scoped for "the first Android release branch." Not yet started.
+4. Remaining `store/play-console.md` submission-checklist items, most of which are the user's own account/billing actions: Google Play Console developer account ($25 one-time), publish `store/privacy-policy.md` at a public URL, tighten `ALLOWED_ORIGIN` in `worker/wrangler.toml`, RevenueCat Android/Play product setup.
+5. iOS track unchanged: buy an iPhone, confirm Apple Developer Program membership, then `eas build` + device checklist.
+
+**Blocked on user:**
+- The 12+ vs 18+ age-rating sign-off above.
+- Reattaching an Android device/emulator to finish the smoke test.
+- Google Play Console account, RevenueCat Android setup, Apple Developer Program membership + iPhone purchase (all longstanding, unchanged).
+
+**Risks/unverified:**
+- The new `/v1/report` endpoint is covered by unit tests and a manual `wrangler dev` smoke test (per the commit message) but has not been exercised against the deployed production Worker or from a real device.
+- Android's golden path beyond onboarding, and Android speech-to-text specifically, remain completely unverified (unchanged from the entry below).
+
 ## 2026-07-13 — Android emulator smoke test attempted (blocked); Play compliance doc landed; session closed out
 
 **Done:**
