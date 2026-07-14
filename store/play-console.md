@@ -15,9 +15,9 @@
 | P-4 Data Safety form | **Answers drafted below** — Worker persistence audit confirmed the claims |
 | P-5 mic prominent disclosure | **Built** — in-app disclosure with accept/decline now precedes the OS permission prompt |
 | P-6 target API 36 | **Already satisfied** — Expo SDK 57 builds against target API 36 by default |
-| P-7 age gating / Play Age Signals API | **Open — deferred code item**, see below |
+| P-7 age gating / Play Age Signals API | **18+ positioning confirmed by Darcy 2026-07-14.** Age Signals API integration itself is still **open — deferred code item**, see below |
 | P-8 trial disclosure | **N/A** — no trial; paywall copy says "No trial" explicitly |
-| P-9 IARC questionnaire | **Guidance drafted below** — filled in Play Console at submission |
+| P-9 IARC questionnaire | **Answers confirmed (18+)** — filled in Play Console at submission |
 
 ## Store listing
 
@@ -57,9 +57,9 @@ Basis: Worker persistence audit 2026-07-13 — only rate-limit counters (device-
 
 Per `store/play-compliance.md` P-7, the position of record is **18+ / adults-only targeting**: open-ended AI chat with no minor-specific safeguards (Character.AI precedent, state App Store Accountability Acts). Answer the IARC questionnaire honestly: realistic interpersonal conflict, infrequent mild profanity (difficulty 3), no violence/sexual content, **contains AI-generated content the user converses with**, in-app purchases yes, no user-to-user interaction, no location sharing. In "Target audience and content," select 18+ only; do not target children.
 
-> ⚠️ Note the divergence from the Apple track (12+ per SPEC §5.4). Per-store divergence is
-> legitimate, but it halves nothing on iOS while shrinking the Play audience — this is the
-> planning model's prescribed position, **flag to Darcy for explicit sign-off before submission**.
+> **Confirmed by Darcy, 2026-07-14: go with 18+.** Note this diverges from the Apple track
+> (12+ per SPEC §5.4) — that's expected and fine per-store, and shrinks the Play audience
+> slightly rather than the reverse, so there's no compliance downside to it.
 
 **Deferred code item:** the Play Age Signals API integration (TX/UT/LA laws) is scoped for the first Android release branch — consume the age-range signal and hard-block "minor" signals. Not yet implemented; do not submit to Play before either integrating it or confirming current enforcement scope makes it non-blocking at submission time.
 
