@@ -7,6 +7,10 @@
     "preview": {
       "distribution": "internal"
     },
-    "production": {}
+    "production": {
+      "env": {
+        "EXPO_PUBLIC_WORKER_URL": "https://soundingboard-api.darcy0408.workers.dev"
+      }
+    }
   }
 }

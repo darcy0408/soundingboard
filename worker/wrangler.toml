@@ -15,9 +15,12 @@ compatibility_flags = ["nodejs_compat"]
 # ---------------------------------------------------------------------------
 
 [vars]
-# Non-secret config. CORS origin(s) allowed to call this Worker — tighten
-# before shipping (SPEC.md §3: "CORS locked to app").
-ALLOWED_ORIGIN = "*"
+# Non-secret config. CORS allow-origin. The native app sends no Origin header,
+# so CORS never applies to it — this fixed value exists purely to stop browser
+# JS on arbitrary websites from calling the API (SPEC.md §3: "CORS locked to
+# app"). There is no legitimate web client (no web app, per the cut list), so
+# the value is an intentionally dead origin.
+ALLOWED_ORIGIN = "https://no-web-clients.soundingboard.invalid"
 
 # ---------------------------------------------------------------------------
 # KV namespace for per-device rate limiting (SPEC.md §3, §4).

@@ -1,4 +1,5 @@
-// RevenueCat wiring (SPEC.md §6, P2). iOS only — SPEC.md §9 cut list has no Android target.
+// RevenueCat wiring (SPEC.md §6, P2). iOS + Android — Android came into v1 scope 2026-07-12
+// (SPEC.md §9); RevenueCat issues one public SDK key per store, selected by platform below.
 //
 // Verified against the installed react-native-purchases@10.4.2 type declarations (not assumed
 // from training data — RevenueCat's JS API has changed across major versions): `Purchases.configure`,
@@ -23,7 +24,10 @@ import { useEntitlementStore } from '@/stores/entitlementStore';
 // dashboard entitlement ends up named something else, update this constant to match.
 const PRO_ENTITLEMENT_ID = 'pro';
 
-const IOS_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY;
+const API_KEY = Platform.select({
+  ios: process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY,
+  android: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY,
+});
 
 let configured = false;
 
@@ -38,10 +42,10 @@ function isProFromCustomerInfo(info: CustomerInfo): boolean {
  * the __DEV__ manual toggle in entitlementStore keep working unaffected.
  */
 export function initPurchases() {
-  if (configured || Platform.OS !== 'ios' || !IOS_API_KEY) return;
+  if (configured || !API_KEY) return;
   configured = true;
 
-  Purchases.configure({ apiKey: IOS_API_KEY });
+  Purchases.configure({ apiKey: API_KEY });
   if (__DEV__) {
     Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG).catch(() => {});
   }

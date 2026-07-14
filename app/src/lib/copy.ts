@@ -6,3 +6,7 @@ export const AI_CONSENT_TEXT =
 
 export const DISCLAIMER_TEXT =
   "SoundingBoard is a communication-practice tool. It is not a substitute for professional medical, legal, psychological, or emergency advice, and it does not diagnose, treat, or provide therapy for any condition. If you're in crisis or experiencing a mental health emergency, contact a licensed professional or emergency services.";
+
+// Published from the darcy0408/soundingboard-legal repo (GitHub Pages); source of truth for the
+// wording is store/privacy-policy.md in this repo — update there first, then mirror.
+export const PRIVACY_POLICY_URL = 'https://darcy0408.github.io/soundingboard-legal/';

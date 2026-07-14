@@ -1,11 +1,11 @@
 import { useRouter } from 'expo-router';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
-import { AI_CONSENT_TEXT, DISCLAIMER_TEXT } from '@/lib/copy';
+import { AI_CONSENT_TEXT, DISCLAIMER_TEXT, PRIVACY_POLICY_URL } from '@/lib/copy';
 import { useOnboardingStore } from '@/stores/onboardingStore';
 
 export default function OnboardingConsent() {
@@ -21,10 +21,7 @@ export default function OnboardingConsent() {
 
         <View style={styles.consentBlock}>
           <ThemedText type="default">{AI_CONSENT_TEXT}</ThemedText>
-          <Pressable
-            onPress={() =>
-              Alert.alert('Privacy Policy', 'The privacy policy will be linked here at launch.')
-            }>
+          <Pressable onPress={() => void Linking.openURL(PRIVACY_POLICY_URL)}>
             <ThemedText type="linkPrimary">Privacy Policy</ThemedText>
           </Pressable>
         </View>

@@ -1,13 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Card } from '@/components/card';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { AI_CONSENT_TEXT, DISCLAIMER_TEXT } from '@/lib/copy';
+import { AI_CONSENT_TEXT, DISCLAIMER_TEXT, PRIVACY_POLICY_URL } from '@/lib/copy';
 import { restorePurchases } from '@/lib/purchases';
 import { useEntitlementStore } from '@/stores/entitlementStore';
 import { useHistoryStore } from '@/stores/historyStore';
@@ -77,12 +77,7 @@ export default function Settings() {
 
       <Section title="Account">
         <Row label="Restore Purchases" onPress={handleRestore} />
-        <Row
-          label="Privacy Policy"
-          onPress={() =>
-            Alert.alert('Privacy Policy', 'The privacy policy will be linked here at launch.')
-          }
-        />
+        <Row label="Privacy Policy" onPress={() => void Linking.openURL(PRIVACY_POLICY_URL)} />
       </Section>
     </ScrollView>
   );

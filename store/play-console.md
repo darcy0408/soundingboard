@@ -15,7 +15,7 @@
 | P-4 Data Safety form | **Answers drafted below** — Worker persistence audit confirmed the claims |
 | P-5 mic prominent disclosure | **Built** — in-app disclosure with accept/decline now precedes the OS permission prompt |
 | P-6 target API 36 | **Already satisfied** — Expo SDK 57 builds against target API 36 by default |
-| P-7 age gating / Play Age Signals API | **18+ positioning confirmed by Darcy 2026-07-14.** Age Signals API integration itself is still **open — deferred code item**, see below |
+| P-7 age gating / Play Age Signals API | **18+ positioning confirmed by Darcy 2026-07-14.** Age Signals API research done 2026-07-14: **not a Play submission requirement** — see the decision under "IARC questionnaire" below |
 | P-8 trial disclosure | **N/A** — no trial; paywall copy says "No trial" explicitly |
 | P-9 IARC questionnaire | **Answers confirmed (18+)** — filled in Play Console at submission |
 
@@ -31,7 +31,7 @@
 
 **Category:** Productivity. **Tags:** communication, self-improvement (avoid anything health-flavored — P-2).
 
-**Contact email:** darcy0408@gmail.com. **Privacy policy URL:** publish `store/privacy-policy.md` first (required field — see checklist).
+**Contact email:** darcy0408@gmail.com. **Privacy policy URL (live):** `https://darcy0408.github.io/soundingboard-legal/` (published 2026-07-14 from the public `darcy0408/soundingboard-legal` repo; source of truth is `store/privacy-policy.md` here — edit there first, then mirror).
 
 ## Data Safety form answers (P-4)
 
@@ -61,15 +61,16 @@ Per `store/play-compliance.md` P-7, the position of record is **18+ / adults-onl
 > (12+ per SPEC §5.4) — that's expected and fine per-store, and shrinks the Play audience
 > slightly rather than the reverse, so there's no compliance downside to it.
 
-**Deferred code item:** the Play Age Signals API integration (TX/UT/LA laws) is scoped for the first Android release branch — consume the age-range signal and hard-block "minor" signals. Not yet implemented; do not submit to Play before either integrating it or confirming current enforcement scope makes it non-blocking at submission time.
+**Age Signals API — decision of record (researched 2026-07-14):** submit **without** integrating it. Google's own policy page says Play "doesn't mandate the use of these features" — it is opt-in tooling, not a submission gate. Legal landscape: only Texas's law is live (SCOTUS declined to block it 2026-07-06); Utah delayed to May 2027 and Louisiana to July 2027 by amendment. For an app accurately rated 18+, not child-directed, and requesting no age signals, the store-level age gate is Google's side of the transaction and the accurate rating is ours. Two caveats: (1) this is a synthesis from Google's docs, not a Google statement about the 18+ case specifically — there is an unresolved Play developer-community thread on exactly this ("Clarification on Play Age Signals API (beta) Requirement for 18+ Target Audience", thread 383183265) worth a manual read before submitting; (2) revisit before mid-2027 when Utah/Louisiana come into force. No official React Native/Expo wrapper exists (native Kotlin library only), so integration later means a custom or third-party native module — budget real work.
 
 ## Submission checklist (in order)
 
-1. **Darcy:** Google Play Console developer account ($25 one-time), identity verification (individual account is fine — we are staying out of the health classification that would demand an Organization Account).
-2. **Darcy:** publish `store/privacy-policy.md` at a public URL (GitHub Pages works); paste the URL in Play Console *and* the in-app consent screen link.
-3. Tighten `ALLOWED_ORIGIN` in `worker/wrangler.toml` (shared with the iOS track).
-4. **Darcy:** RevenueCat — create the Play (Android) project half: Play Console subscription products mirroring `sb_monthly_999`/`sb_annual_4999`, entitlement `pro`, then set `EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY` (pattern in `app/src/lib/purchases.ts` / `app/README.md`).
-5. Age Signals API integration (P-7 above) or a documented decision that it's non-blocking.
-6. `npx eas build --platform android` (production AAB), signed by EAS-managed credentials.
-7. Real-device pass: STT works (biggest unknown — emulators are unreliable for speech), report flow round-trips, mic disclosure shows before the OS prompt, paywall loads Play prices.
-8. Screenshots (phone + 7" tablet minimum), IARC questionnaire, Data Safety form (answers above), AI-content declaration, listing copy — submit for review.
+1. ~~Play Console developer account~~ — **done** (Darcy has one). ⚠️ **Check the account's creation date:** personal accounts created after 2023-11-13 must run a **closed test with ≥12 testers opted in for 14 consecutive days** before production access (current policy, verified 2026-07-14 against Google's help page; dropping below 12 resets the clock). If the account is newer than that cutoff, this is the longest pole in the schedule — start recruiting testers now.
+2. ~~Privacy policy URL~~ — **done 2026-07-14:** live at `https://darcy0408.github.io/soundingboard-legal/`, wired into the in-app consent + settings links.
+3. ~~Tighten `ALLOWED_ORIGIN`~~ — **done 2026-07-14**, deployed (Worker version `0fe9a346`). Also covers the iOS track.
+4. ~~Age Signals decision~~ — **done:** submit without integrating (decision of record above).
+5. **Darcy:** Play Console — create the app entry (name SoundingBoard, app, free-with-IAP, US-English default), complete the setup declarations using this doc's answers.
+6. `npx eas build --platform android --profile production` (production AAB; needs `npx eas login` first). Upload it to the **closed testing** track — this both starts the 12-tester clock (if applicable) *and* unlocks subscription-product creation, which Play requires a billing-capable build for.
+7. **Darcy:** Play Console → Monetize → create subscriptions `sb_monthly_999` ($9.99/mo) and `sb_annual_4999` ($49.99/yr); RevenueCat → add the Google Play platform (needs a Play service-account JSON per RevenueCat's docs), entitlement `pro`, offering with monthly/annual packages; then set `EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY` (code already selects it per-platform in `app/src/lib/purchases.ts`) and rebuild.
+8. Real-device pass: STT works (biggest unknown — emulators are unreliable for speech), report flow round-trips against production, mic disclosure shows before the OS prompt, paywall loads Play prices.
+9. Screenshots (phone + 7" tablet minimum), IARC questionnaire, Data Safety form (answers above), AI-content declaration, listing copy — submit for review.
