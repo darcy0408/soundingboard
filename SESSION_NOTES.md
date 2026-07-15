@@ -1,5 +1,40 @@
 # Session notes
 
+## 2026-07-14 — Play submission prep: production deploy, live privacy policy, Android RevenueCat wiring; 18+ age rating confirmed
+
+**Done:**
+- Confirmed with the user: Google Play's IARC age rating will be **18+**, diverging intentionally from Apple's 12+ target in `SPEC.md` §5.4. Recorded in `store/play-console.md` (commit `48c6d00`).
+- `app/src/lib/purchases.ts` now selects the RevenueCat public SDK key per platform (`Platform.select` between `EXPO_PUBLIC_REVENUECAT_IOS_API_KEY` and the new `EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY`, documented in `app/.env.example`). `app/eas.json`'s production build profile now pins `EXPO_PUBLIC_WORKER_URL` so production builds stop failing loudly for lack of it.
+- **Production Worker deploy (real external action, not just local verification):** `ALLOWED_ORIGIN` in `worker/wrangler.toml` tightened from `"*"` to a fixed dead origin — native apps send no `Origin` header, so this only blocks browser JS on arbitrary websites from calling the API (`SPEC.md` §3's "CORS locked to app" requirement). Deployed to production alongside the `/v1/report` endpoint from the previous entry; a live smoke test against production came back green (Worker version `0fe9a346`).
+- **Privacy policy published live (real external action):** `https://darcy0408.github.io/soundingboard-legal/`, served via GitHub Pages from a new public repo `darcy0408/soundingboard-legal`. `store/privacy-policy.md` in *this* repo remains the source of truth — edit there first, then mirror to the public repo. Wired into the app's onboarding consent screen and settings screen (`app/src/app/onboarding/consent.tsx`, `app/src/app/settings.tsx`, `app/src/lib/copy.ts`), replacing launch-placeholder links.
+- **Play Age Signals API (P-7) researched and decided:** submitting to Play without integrating it. Google's policy states Play does not mandate this API for submission; of the relevant state laws, only Texas's is currently in effect (Utah delayed to May 2027, Louisiana to July 2027). Two caveats recorded in `store/play-console.md`: there's an unresolved Google Play developer-community thread specifically asking about the 18+ case, worth a manual read before submitting; and this decision should be revisited before mid-2027. No official Expo/React Native wrapper exists for this API — a future integration would need a custom or third-party native module.
+- **Play Console submission-checklist discovery:** personal Google Play developer accounts created after 2023-11-13 must complete a closed test with 12+ opted-in testers for 14 consecutive days before getting production access (dropping below 12 resets the clock). Flagged in `store/play-console.md` item 1 as the possible longest pole in the Android launch schedule — whether it applies depends on when the user's Play Console account was created, which has not yet been checked.
+- Re-verified before closing: `tsc --noEmit` clean in both `app/` and `worker/`, `expo lint` clean in `app/`, 73/73 `worker` vitest tests passing.
+
+**Decisions:**
+- 18+ Play age rating, confirmed by the user this session — diverges from Apple's 12+ deliberately; the documented rationale is that it has no compliance downside, only a smaller addressable audience on Play.
+- Submit to Play without integrating the Age Signals API — a considered, documented risk acceptance (see above), not an oversight. Revisit before mid-2027 when Utah's and Louisiana's laws take effect.
+
+**Next:**
+1. **Check the Google Play Console account's creation date** — determines whether the 12-tester/14-day closed-testing requirement applies, and is now the most schedule-critical open item for Android launch (`store/play-console.md` item 1).
+2. **Android — still unresolved from prior entries:** reattach a device or emulator, finish the golden-path smoke test past onboarding, and verify Android speech-to-text actually works — still the single biggest technical unknown, and increasingly the thing everything else is now waiting on.
+3. Create the Play Console app entry and complete its setup declarations using `store/play-console.md`'s drafted answers (user action, needs Play Console access).
+4. `npx eas build --platform android --profile production`, upload to the closed testing track — starts the tester clock if applicable, and is required before Play allows creating subscription products.
+5. Play Console → Monetize: create `sb_monthly_999`/`sb_annual_4999` subscriptions; RevenueCat → add the Google Play platform (needs a Play service-account JSON) → entitlement `pro` → offering with both packages → set `EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY` → rebuild.
+6. Real-device pass before submission: speech-to-text, the report flow against production, mic-disclosure ordering, Play paywall pricing.
+7. iOS track, unchanged and still not started: buy an iPhone, confirm Apple Developer Program membership, then `eas build` + the device checklist in `app/README.md`.
+
+**Blocked on user:**
+- Confirming the Play Console account creation date (item 1 above).
+- Reattaching an Android device or emulator to finish the smoke test.
+- Play Console app-entry creation, subscription product creation, and RevenueCat's Google Play platform setup — all require the user's own account access.
+- iPhone purchase and Apple Developer Program membership (unchanged, longstanding).
+
+**Risks/unverified:**
+- Android's golden path beyond onboarding, and Android speech-to-text specifically, remain completely unverified — unchanged from prior entries, and increasingly load-bearing since so much store-readiness work has landed around it without the app itself being confirmed to work end-to-end on the platform.
+- The Age Signals API decision rests partly on a synthesis of Google's policy docs rather than a direct Google statement about the 18+ case specifically — read the community thread referenced in `store/play-console.md` before submitting.
+- **The production Worker deploy and the live privacy-policy publish recorded in this entry were real, externally-visible actions taken autonomously by a concurrent session, not confirmed live by the user directly.** Worth the user independently checking both — that the deployed Worker behaves as expected in production, and that the GitHub Pages site actually renders — before treating them as settled.
+
 ## 2026-07-13 — Play compliance P-1/P-5 implemented; Play Console prep doc written (concurrent session, verified and pushed)
 
 **Done:**
