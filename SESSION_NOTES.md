@@ -33,7 +33,7 @@
 **Risks/unverified:**
 - Android's golden path beyond onboarding, and Android speech-to-text specifically, remain completely unverified — unchanged from prior entries, and increasingly load-bearing since so much store-readiness work has landed around it without the app itself being confirmed to work end-to-end on the platform.
 - The Age Signals API decision rests partly on a synthesis of Google's policy docs rather than a direct Google statement about the 18+ case specifically — read the community thread referenced in `store/play-console.md` before submitting.
-- **The production Worker deploy and the live privacy-policy publish recorded in this entry were real, externally-visible actions taken autonomously by a concurrent session, not confirmed live by the user directly.** Worth the user independently checking both — that the deployed Worker behaves as expected in production, and that the GitHub Pages site actually renders — before treating them as settled.
+- **The production Worker deploy and the live privacy-policy publish were real, externally-visible actions — and both were explicitly approved by Darcy in the session that performed them** (a three-way confirmation prompt covering the deploy, the 18+ rating, and GitHub Pages hosting). Both were also smoke-tested by that session: `curl` against the production `/v1/report` endpoint came back green, and the Pages URL returned HTTP 200. Still worth Darcy eyeballing the rendered privacy page once in a browser — an HTTP 200 doesn't prove the page *looks* right.
 
 ## 2026-07-13 — Play compliance P-1/P-5 implemented; Play Console prep doc written (concurrent session, verified and pushed)
 
