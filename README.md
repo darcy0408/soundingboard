@@ -30,12 +30,14 @@ TypeScript throughout. Expo / React Native / Expo Router + Zustand on the client
 
 ## Status
 
-Pre-launch, actively built.
+**Parked.** Feature-complete as a working prototype; store submission is not being pursued. The code is published as a reference implementation rather than a shipping product.
 
 - Both modes implemented end to end against a **production-deployed Worker**
 - 73 Worker tests passing; `tsc --noEmit` and `expo lint` clean across app and worker
 - Store-compliance work landed: published privacy policy, mic prominent-disclosure, report-AI-response control, CORS locked down
-- Android and iOS store submissions not yet complete
+- Android and iOS store submissions not completed
+
+The parts most likely to be useful to someone else: the Worker-as-credential-boundary pattern in `worker/`, the on-device speech recognition setup, and the App Store positioning analysis in `SPEC.md`.
 
 ## Layout
 
