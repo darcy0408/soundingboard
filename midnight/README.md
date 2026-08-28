@@ -222,6 +222,38 @@ anything else.
   `keys/` and `zkir/` output has to be served as static assets.
 - Proving can be **wallet-delegated** rather than pointed at `localhost:6300`.
 
+### Which Lace extension (the docs are out of date)
+
+`docs/guides/_lace-wallet.mdx` sends you to **Lace Beta**
+(`hgeekaiplokcnmakghbdfbgnlfheichg`). On install, that extension displays:
+
+> Important: Lace Midnight Preview is being deprecated. Midnight is now
+> available and only supported in the main Lace extension.
+
+So Midnight support has moved into the **main** Lace extension (IOHK USA LLC),
+whose store listing still describes only Cardano and does not mention Midnight
+— which makes it look like the wrong one. The docs and the store listing are
+both behind the product.
+
+For the hackathon we stayed on Lace Beta: it is installed, configured, and
+works. If Beta stops functioning, switch to main Lace — that is the supported
+path, not a workaround.
+
+### Proof server: choose Local, not Remote
+
+Lace's "Configure Midnight" screen offers a remote proof server
+(`https://proof-server.preview.midnight.network`) or local
+(`http://localhost:6300`). **Choose local.**
+
+The proof server receives the *witness* — the private inputs — in order to
+build the proof. Proving remotely would send the session commitments to a
+third party, which is precisely what Practice Proof claims does not happen.
+Local proving is what makes the privacy claim true, so it is a correctness
+requirement here, not a preference.
+
+Cost: Docker must be running whenever the wallet proves. If a transaction
+hangs, check `docker ps` first.
+
 ### Prerequisite that needs a human, before Phase 2 starts
 
 The Lace extension must be installed and **its own wallet funded from the
