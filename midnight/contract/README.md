@@ -99,7 +99,7 @@ source ~/mnenv.sh
 cd midnight/contract
 npm install
 npm run build        # full compile incl. ZK keys (~7 s)
-npm test             # 22 tests
+npm test             # 31 tests
 npm run typecheck    # requires a build first
 ```
 
@@ -110,12 +110,21 @@ generation, so use the full build before trusting anything about proving.
 while Preview runs ledger 8 — contracts built on it compile cleanly and then
 fail on-chain. Both build scripts pin `+0.31.1` explicitly.
 
-The test suite covers the happy path, both claim bounds, padding rejection, the
-mask boundary from both sides (a duplicate at the boundary is ignored at
-`claimed=3` and caught at `claimed=4`), monotonicity in all three directions,
-identity isolation between users, and the privacy invariants — that no
-commitment ever reaches the ledger, and that two users with identical practice
-history still get distinct on-chain identities.
+`practice_attestation.test.ts` covers the circuit: the happy path, both claim
+bounds, padding rejection, the mask boundary from both sides (a duplicate at the
+boundary is ignored at `claimed=3` and caught at `claimed=4`), monotonicity in
+all three directions, identity isolation between users, and the privacy
+invariants — that no commitment ever reaches the ledger, and that two users with
+identical practice history still get distinct on-chain identities.
+
+`witness-file.test.ts` covers the **file format** that crosses process
+boundaries: app (React Native) → exported JSON → attest dApp (browser) → this
+circuit. Nothing type-checks across that seam, so the suite runs a
+representative export straight through the real contract.
+`test/fixtures/sample-witness.json` is generated with the exact derivation in
+`app/src/lib/practiceProof.ts`, so it is what the app actually emits rather than
+hand-written hex — and it doubles as the standalone demo input if the mobile
+export is ever unavailable.
 
 ## Honest limitation
 

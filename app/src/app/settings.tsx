@@ -8,6 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { AI_CONSENT_TEXT, DISCLAIMER_TEXT, PRIVACY_POLICY_URL } from '@/lib/copy';
+import { clearPracticeKeys } from '@/lib/practiceProof';
 import { restorePurchases } from '@/lib/purchases';
 import { useEntitlementStore } from '@/stores/entitlementStore';
 import { useHistoryStore } from '@/stores/historyStore';
@@ -45,6 +46,10 @@ export default function Settings() {
           style: 'destructive',
           onPress: async () => {
             await AsyncStorage.clear();
+            // AsyncStorage.clear() removes the stored Practice Proof keys, but the
+            // module caches them in memory for the life of the process — without
+            // this the deleted identity would keep being used until an app restart.
+            await clearPracticeKeys();
             clearHistory();
             resetEntitlement();
             resetOnboarding();
@@ -68,6 +73,7 @@ export default function Settings() {
       </Section>
 
       <Section title="Your data">
+        <Row label="Practice Proof" onPress={() => router.push('/practice-proof')} />
         <Row
           label="Delete all my data"
           onPress={confirmDelete}

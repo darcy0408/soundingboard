@@ -56,6 +56,7 @@ export default function RootLayout() {
           options={{ title: 'SoundingBoard Plus', presentation: 'modal' }}
         />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+        <Stack.Screen name="practice-proof" options={{ title: 'Practice Proof' }} />
       </Stack>
     </ThemeProvider>
   );
