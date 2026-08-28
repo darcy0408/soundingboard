@@ -185,6 +185,51 @@ The sync dominates. `InMemoryTransactionHistoryStorage` does not persist sync
 state, so every process start pays it again — worth replacing with a persistent
 store before Phase 2 iterates on deploys.
 
+## Notes for Phase 2 (attest web dApp)
+
+### The ~13 min sync does not apply to the dApp
+
+Worth stating explicitly, because it looks like a blocker and isn't. That cost
+belongs to the **headless** `WalletFacade` path used by these scripts. The web
+dApp connects to the **Lace browser extension** through the DApp Connector API
+(`connect("preview")`), and the extension maintains its own sync continuously.
+
+It also cannot be fixed on the headless side with the current SDK. The
+sub-wallets expose `serializeState()` (write), but `wallet-sdk-shielded` 3.0.1,
+`-dust-wallet` 4.1.0 and `-unshielded-wallet` 3.1.0 only offer
+`startWithSeed` / `startWithSecretKeys` / `startWithSecretKey` /
+`startWithPublicKey` as builders — there is no restore-from-serialized entry
+point, and `WalletFacade.init` takes those builders. So for headless scripts
+the mitigation is to keep one long-lived process, not to persist state.
+
+### Carry the ledger-v8 override into every new package
+
+Trap 5 above is not specific to this smoke test. Any package that combines
+`midnight-js-*` with `wallet-sdk-*` gets two copies of the ledger wasm. The
+attest dApp will do exactly that, so start its `package.json` with:
+
+```json
+"overrides": { "@midnight-ntwrk/ledger-v8": "8.1.0" }
+```
+
+and verify with `find node_modules -type d -name ledger-v8` before debugging
+anything else.
+
+### Two things that differ from these scripts
+
+- Use **`FetchZkConfigProvider`**, not `NodeZkConfigProvider` — the browser
+  fetches ZK config over HTTP rather than reading the filesystem. The compiled
+  `keys/` and `zkir/` output has to be served as static assets.
+- Proving can be **wallet-delegated** rather than pointed at `localhost:6300`.
+
+### Prerequisite that needs a human, before Phase 2 starts
+
+The Lace extension must be installed and **its own wallet funded from the
+faucet**. Lace derives a different address from the headless seed in
+`~/.midnight-soundingboard/`, so the 5000 tNIGHT already collected does **not**
+cover it. That NIGHT must also be registered for DUST before the dApp can
+submit anything. Doing this early avoids discovering it mid-demo.
+
 ## Layout
 
 ```
