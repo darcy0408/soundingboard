@@ -4,3 +4,5 @@ build/
 # Wallet seeds must never be committed — this repo is public.
 wallet.json
 .wallet/
+# levelPrivateStateProvider runtime state, not source.
+midnight-level-db/

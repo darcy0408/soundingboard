@@ -41,6 +41,7 @@ import { httpClientProofProvider } from "@midnight-ntwrk/midnight-js-http-client
 import { indexerPublicDataProvider } from "@midnight-ntwrk/midnight-js-indexer-public-data-provider";
 import { levelPrivateStateProvider } from "@midnight-ntwrk/midnight-js-level-private-state-provider";
 import { NodeZkConfigProvider } from "@midnight-ntwrk/midnight-js-node-zk-config-provider";
+import { setNetworkId } from "@midnight-ntwrk/midnight-js-network-id";
 import * as Rx from "rxjs";
 
 const NETWORK = "preview" as const;
@@ -57,6 +58,11 @@ const INDEXER_WS = `wss://indexer.preview.midnight.network/api/${INDEXER_API}/gr
 const PROOF_SERVER = "http://localhost:6300";
 
 const log = (m: string) => console.log(`[deploy] ${m}`);
+
+// midnight-js keeps the network id in module-global state and throws
+// "Network ID has not been configured" from deep inside deployContract if it
+// is unset. Must happen before any wallet or contract operation.
+setNetworkId(NETWORK);
 
 async function main() {
   const { seed } = JSON.parse(readFileSync(SEED_PATH, "utf8"));
@@ -134,9 +140,21 @@ async function main() {
   if (dust === 0n) {
     const utxos = (state.unshielded as any).availableCoins ?? [];
     log(`registering ${utxos.length} NIGHT UTXO(s) for DUST generation...`);
+
+    const estimate = await (wallet as any).estimateRegistration(utxos);
+    log(`estimated registration fee: ${estimate.fee}`);
+
     // Registration is self-funding: it pays its fee out of the DUST the
     // registered UTXOs generate, so a 0 DUST balance here is expected.
-    const finalized = await (wallet as any).registerNightUtxosForDustGeneration(utxos);
+    // It signs internally, but needs the verifying key and a sign callback
+    // passed explicitly — omitting them fails deep in wasm (addressFromKey
+    // on undefined), not with a helpful arity error.
+    const recipe = await (wallet as any).registerNightUtxosForDustGeneration(
+      utxos,
+      keystore.getPublicKey(),
+      (payload: unknown) => keystore.signData(payload as never),
+    );
+    const finalized = await wallet.finalizeRecipe(recipe);
     const txId = await wallet.submitTransaction(finalized);
     log(`registration tx: ${txId}`);
 

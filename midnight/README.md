@@ -100,6 +100,91 @@ consequences baked into the scripts here:
 Also note `InMemoryTransactionHistoryStorage` means sync state is not persisted
 between runs.
 
+### 5. Two copies of the ledger wasm module (the expensive one)
+
+`@midnight-ntwrk/midnight-js-protocol` pins `@midnight-ntwrk/ledger-v8` to
+**exactly `8.1.0`**, while every `wallet-sdk-*` package asks for `^8.1.0`, which
+resolves to `8.1.1`. npm satisfies both by installing *two* copies.
+
+wasm-bindgen classes carry per-module identity, so a `LedgerParameters` built
+from the hoisted 8.1.1 copy is rejected by the nested 8.1.0 copy:
+
+```
+Error: expected instance of LedgerParameters
+  at Transaction.feesWithMargin (.../midnight-js-protocol/node_modules/@midnight-ntwrk/ledger-v8/...)
+```
+
+The error names a type, not a version, so it reads like a coding mistake. The
+giveaway is the **nested** path in the stack trace. Fix by forcing one copy:
+
+```json
+"overrides": { "@midnight-ntwrk/ledger-v8": "8.1.0" }
+```
+
+Verify with `find node_modules -type d -name ledger-v8` — exactly one result.
+Any project combining `midnight-js-*` with `wallet-sdk-*` needs this.
+
+### 6. `setNetworkId()` is required, and fails late
+
+midnight-js keeps the network id in module-global state. Forget it and
+`deployContract` throws `Network ID has not been configured` *after* sync and
+DUST are done. Call `setNetworkId('preview')` at module load.
+
+### 7. `registerNightUtxosForDustGeneration` takes three arguments
+
+The prose "handles signing internally; no separate signRecipe step" is true but
+easy to misread — it signs internally *with a callback you supply*:
+
+```typescript
+const recipe = await wallet.registerNightUtxosForDustGeneration(
+  utxos,
+  keystore.getPublicKey(),
+  (payload) => keystore.signData(payload),
+);
+const finalized = await wallet.finalizeRecipe(recipe);   // returns a RECIPE, not a tx
+const txId = await wallet.submitTransaction(finalized);
+```
+
+Passing only `utxos` fails inside wasm as
+`Cannot read properties of undefined (reading 'length')` in `addressFromKey`,
+with no hint about arity.
+
+## Phase 0 result — verified deploy
+
+The compact-examples counter, compiled with 0.31.1 and deployed to Preview:
+
+| | |
+|---|---|
+| Contract address | `e0e3fee37d7369c33f60824cd69a5316277c2b08f9177a016f8b9c93ee42bb78` |
+| Block height | 621821 |
+| Deploy tx (SDK `txId`) | `00f9859a67ea22672034ce124ebbb5d62e938624c4a2b5df04c75db95bb2ad816c` |
+| Tx hash (indexer) | `c414c82ced2f1b709f2bc9559a933833014647a4864c16bf292bbe09bcbd4a46` |
+
+The SDK's `txId` and the indexer's `transaction.hash` are different encodings of
+the same transaction — don't expect them to match when cross-checking.
+
+Independently confirmed on-chain, rather than trusting the deploy script:
+
+```bash
+curl -s -X POST -H "Content-Type: application/json" \
+  -d '{"query":"{ contractAction(address: \"e0e3fee37d7369c33f60824cd69a5316277c2b08f9177a016f8b9c93ee42bb78\") { __typename address transaction { hash block { height } } } }"}' \
+  https://indexer.preview.midnight.network/api/v3/graphql
+# => {"contractAction":{"__typename":"ContractDeploy", ... "block":{"height":621821}}}
+```
+
+Measured timings on this machine, for planning Phase 2:
+
+| Step | Time |
+|---|---|
+| First wallet sync (every run — not persisted) | ~13 min |
+| DUST registration | seconds; fee of **1**, self-funding |
+| DUST accrual after registration | effectively immediate |
+| Deploy incl. proof generation | < 1 min |
+
+The sync dominates. `InMemoryTransactionHistoryStorage` does not persist sync
+state, so every process start pays it again — worth replacing with a persistent
+store before Phase 2 iterates on deploys.
+
 ## Layout
 
 ```
