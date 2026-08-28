@@ -1,0 +1,22 @@
+{
+  "name": "sb-practice-attestation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Practice Proof: Compact contract proving completed rehearsal sessions without revealing them.",
+  "scripts": {
+    "build": "compact compile +0.31.1 src/practice_attestation.compact build/practice_attestation",
+    "build:fast": "compact compile +0.31.1 --skip-zk src/practice_attestation.compact build/practice_attestation",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@midnight-ntwrk/compact-runtime": "0.16.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  }
+}

@@ -1,0 +1,185 @@
+// practice_attestation.compact
+//
+// SoundingBoard "Practice Proof" — a zero-knowledge attestation that a user has
+// completed at least N rehearsal sessions, without revealing anything about them.
+//
+// WHAT GOES ON-CHAIN (the entire public footprint):
+//   milestones[identity] = claimed
+//   ...where `identity` is a hash of a device-local secret and `claimed` is a
+//   small integer. Nothing else. No transcripts, no scores, no scenarios, no
+//   timestamps, no session ids, not even the number of sessions actually held.
+//
+// WHAT NEVER LEAVES THE PROVER:
+//   The secret key, and the per-session commitments. Both are witness values;
+//   they exist only inside the ZK proof on the user's own machine.
+//
+// Compiled with Compact 0.31.1 (language 0.23.0), which is what Midnight
+// Preview accepts. Do NOT build this with 0.34.0 — that targets ledger 9 and
+// will compile cleanly then fail on-chain.
+
+pragma language_version >= 0.22;
+
+import CompactStandardLibrary;
+
+// ============================================================================
+// CAPACITY
+// ============================================================================
+//
+// MAX_SESSIONS = 10. This is a compile-time constant in three places below
+// (the witness Vector width and the two loop bounds) because Compact vectors
+// are fixed-width and Compact loops are fully unrolled — there is no such
+// thing as a runtime-sized loop in a ZK circuit.
+//
+// Cost of raising it: the distinctness check is pairwise, so the circuit grows
+// quadratically — MAX*(MAX-1)/2 comparisons. 10 -> 45 comparisons.
+// 25 -> 300. Each comparison is a native Bytes<32> equality, which is cheap
+// (for scale, the OpenZeppelin Bytes32 `pack` helper alone is ~10,231 rows), so
+// 25 is affordable if a larger milestone is ever wanted. 10 is chosen here to
+// keep proving time short enough to demo live.
+//
+// Note this is deliberately NOT solved by requiring sorted input. Sorted input
+// would make distinctness O(N) instead of O(N^2), but ordering comparisons on
+// Bytes<32> are not native in Compact — they require unpacking to
+// Vector<32, Uint<8>> and converting to U256, which costs far more than the
+// quadratic equality check it would replace.
+
+// ============================================================================
+// LEDGER STATE (public)
+// ============================================================================
+
+// The only public state this contract has: identity -> highest attested
+// milestone. Map operations are publicly visible on-chain, which is intended
+// here — this pair IS the receipt. A third party verifies an attestation by
+// reading this map; no extra circuit is needed for verification.
+export ledger milestones: Map<Bytes<32>, Uint<8>>;
+
+// ============================================================================
+// WITNESSES (private — implemented in TypeScript, run on the user's machine)
+// ============================================================================
+
+// A device-local secret, generated once and never transmitted. This is what
+// makes the on-chain identity unforgeable by anyone else and unlinkable to the
+// user's wallet.
+witness practiceSecretKey(): Bytes<32>;
+
+// Per-session commitments derived on-device from the app's local history:
+// hash(salt, sessionId, completedAt) for each completed rehearse session.
+// Slots beyond the claimed count are ignored by the circuit (see `attest`).
+witness sessionCommitments(): Vector<10, Bytes<32>>;
+
+// ============================================================================
+// IDENTITY DERIVATION
+// ============================================================================
+
+// Derives the public identity from the device secret.
+//
+// persistentHash (SHA-256) rather than transientHash because this value is
+// written to ledger state, and persistent hashes are stable across upgrades.
+// It is called exactly once per transaction, so its higher circuit cost does
+// not matter here.
+//
+// The domain separator prevents this key from colliding with, or being replayed
+// into, any other contract that might hash the same secret.
+circuit deriveIdentity(sk: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([
+    pad(32, "soundingboard:practiceproof:v1"),
+    sk
+  ]);
+}
+
+// ============================================================================
+// ATTESTATION
+// ============================================================================
+
+// Proves the caller holds `claimed` distinct session commitments and records
+// that milestone against their identity.
+//
+// `claimed` is a circuit parameter, so it is public — which is the point. The
+// commitments backing it are witness data and stay private.
+//
+// Monotonic: a new attestation must strictly exceed the recorded milestone.
+// This stops an old proof being replayed to downgrade a record, and means the
+// map always holds the user's high-water mark.
+export circuit attest(claimed: Uint<8>): [] {
+  assert(claimed >= 1, "must claim at least one session");
+  assert(claimed <= 10, "claim exceeds MAX_SESSIONS");
+
+  const commitments = sessionCommitments();
+
+  // No claimed slot may be empty.
+  //
+  // The witness is a fixed-width vector, so a user with fewer than MAX_SESSIONS
+  // real sessions pads the tail with zeros. Padding slots are all equal to each
+  // other, so the pairwise check below already rejects claiming TWO of them —
+  // but claiming exactly ONE padding slot would otherwise slip through and
+  // overstate the milestone by one. Rejecting the zero commitment outright
+  // makes "you cannot count padding as a session" a proven property of the
+  // circuit rather than a convention the exporting app is trusted to follow.
+  //
+  // Cost: MAX_SESSIONS native equality comparisons — negligible next to the
+  // quadratic check below.
+  for (const i of 0..10) {
+    const inClaim = (i as Uint<8>) < claimed;
+    assert(
+      disclose(!inClaim || !(commitments[i] == default<Bytes<32>>)),
+      "claimed more sessions than commitments supplied"
+    );
+  }
+
+  // Pairwise distinctness over the first `claimed` commitments.
+  //
+  // Both loops are unrolled at compile time; the `j > i` guard is a
+  // compile-time constant condition, so only the 45 upper-triangle bodies
+  // survive into the circuit.
+  //
+  // `counted` masks off slots past the claimed count. Because j > i, testing
+  // only j is sufficient — if j is inside the claimed prefix then i is too.
+  // The mask is what allows one fixed-width circuit to serve every claim from
+  // 1 to 10 rather than needing a separate circuit per milestone.
+  for (const i of 0..10) {
+    for (const j of 0..10) {
+      if (j > i) {
+        const counted = (j as Uint<8>) < claimed;
+        assert(
+          disclose(!counted || !(commitments[i] == commitments[j])),
+          "duplicate session commitment"
+        );
+      }
+    }
+  }
+
+  // Disclosing the identity is deliberate and is the only witness-derived value
+  // that becomes public: it is the map key. The secret behind it is not
+  // recoverable from it.
+  const pubkey = disclose(deriveIdentity(practiceSecretKey()));
+
+  if (milestones.member(pubkey)) {
+    assert(claimed > milestones.lookup(pubkey), "milestone must strictly increase");
+  }
+
+  // `claimed` is a circuit parameter, which Compact treats as witness data even
+  // though it is public in practice — writing it to the ledger needs an
+  // explicit disclose. Publishing it is exactly the intent: it is the receipt.
+  milestones.insert(pubkey, disclose(claimed));
+}
+
+// ============================================================================
+// HONEST LIMITATION — read this before trusting an attestation
+// ============================================================================
+//
+// The commitments are generated entirely on the user's device from a
+// self-chosen salt. The circuit proves they are DISTINCT; it does not and
+// cannot prove they correspond to real practice sessions. A determined user
+// could fabricate ten random values and attest to a milestone they did not
+// earn. This is a real gap and it is not papered over anywhere in this project.
+//
+// The fix, deliberately out of scope for the hackathon build: have the
+// SoundingBoard Worker issue a blind signed receipt on each completed
+// POST /v1/feedback, and have this circuit verify those signatures instead of
+// merely checking distinctness. That yields real unforgeability while still
+// keeping the server ignorant of the conversation — the Worker signs a blinded
+// commitment and never learns what it signed.
+//
+// What the current design DOES give you, and what is worth having on its own:
+// the privacy architecture is real. Even with countersigning added, the
+// on-chain footprint stays exactly what it is today — one identity, one number.

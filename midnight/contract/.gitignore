@@ -1,0 +1,4 @@
+node_modules/
+# Compiler output: regenerate with `npm run build`. The prover key alone is ~2.8 MB.
+build/
+*.log
