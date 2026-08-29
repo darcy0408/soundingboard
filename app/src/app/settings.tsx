@@ -8,6 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { AI_CONSENT_TEXT, DISCLAIMER_TEXT, PRIVACY_POLICY_URL } from '@/lib/copy';
+import { clearDeviceId } from '@/lib/device-id';
 import { clearPracticeKeys } from '@/lib/practiceProof';
 import { restorePurchases } from '@/lib/purchases';
 import { useEntitlementStore } from '@/stores/entitlementStore';
@@ -46,10 +47,12 @@ export default function Settings() {
           style: 'destructive',
           onPress: async () => {
             await AsyncStorage.clear();
-            // AsyncStorage.clear() removes the stored Practice Proof keys, but the
-            // module caches them in memory for the life of the process — without
-            // this the deleted identity would keep being used until an app restart.
+            // AsyncStorage.clear() removes the stored values, but these modules
+            // cache them in memory for the life of the process — without this the
+            // deleted identity and device ID would keep being used until an app
+            // restart.
             await clearPracticeKeys();
+            await clearDeviceId();
             clearHistory();
             resetEntitlement();
             resetOnboarding();

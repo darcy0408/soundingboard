@@ -21,3 +21,16 @@ export async function getDeviceId(): Promise<string> {
   cachedId = fresh;
   return fresh;
 }
+
+/**
+ * Forgets the cached device ID so a fresh one is generated on next use.
+ *
+ * AsyncStorage.clear() removes the stored value, but `cachedId` outlives it for
+ * the rest of the process — so without this, "Delete all my data" would keep
+ * sending the old ID to the Worker until the app was restarted. Same reason
+ * clearPracticeKeys() exists in lib/practiceProof.ts.
+ */
+export async function clearDeviceId(): Promise<void> {
+  cachedId = null;
+  await AsyncStorage.removeItem(STORAGE_KEY);
+}
