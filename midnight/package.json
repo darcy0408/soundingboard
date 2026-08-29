@@ -1,0 +1,19 @@
+{
+  "name": "sb-midnight",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Practice Proof: Midnight workspace — Compact contract, deploy scripts, and the attest web dApp.",
+  "workspaces": [
+    "contract",
+    "phase0-smoke",
+    "attest-app"
+  ],
+  "scripts": {
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "overrides": {
+    "@midnight-ntwrk/ledger-v8": "8.1.0"
+  }
+}

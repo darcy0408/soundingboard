@@ -6,7 +6,9 @@
   "description": "Phase 0 toolchain smoke test: compile + wallet + deploy a sample contract to Midnight Preview.",
   "scripts": {
     "wallet": "tsx scripts/wallet.ts",
-    "deploy": "tsx scripts/deploy.ts"
+    "deploy": "tsx scripts/deploy.ts",
+    "check": "tsx scripts/check-contract.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@midnight-ntwrk/compact-js": "2.5.1",
@@ -29,9 +31,6 @@
     "@midnight-ntwrk/wallet-sdk-unshielded-wallet": "^3.1.0",
     "rxjs": "^7.8.0",
     "ws": "^8.19.0"
-  },
-  "overrides": {
-    "@midnight-ntwrk/ledger-v8": "8.1.0"
   },
   "devDependencies": {
     "@types/node": "^20.17.0",

@@ -100,17 +100,27 @@ Full design notes — including why sorted input would be *slower* than the quad
 The Compact toolchain runs under WSL or Linux. Versions are pinned deliberately: **never run bare `compact update`** — it installs 0.34.0, which targets ledger 9, while Preview runs ledger 8, so contracts built on it compile cleanly and then fail on-chain.
 
 ```bash
-cd midnight/contract
+cd midnight            # npm workspace root — install here, not in a member package
 npm install
-npm run build      # compiler 0.31.1, incl. PLONK key generation (~7 s)
-npm test           # 31 tests
+npm run build -w sb-practice-attestation   # compiler 0.31.1, incl. PLONK key generation (~7 s)
+npm test  -w sb-practice-attestation       # 31 tests
 ```
 
 The suite covers the circuit (claim bounds, padding rejection, the mask boundary from both sides, monotonicity, identity isolation, and the privacy invariants) and the **witness file format** that crosses the app → dApp → circuit seam, where nothing type-checks. `midnight/contract/test/fixtures/sample-witness.json` is generated with the exact derivation in `app/src/lib/practiceProof.ts`, so it is what the app really emits rather than hand-written hex — and it doubles as a standalone demo input.
 
 App side: `app/src/lib/practiceProof.ts` derives the commitments; Settings → Practice Proof shows the claimable count and exports the witness.
 
-<!-- TODO(phase-2): attest dApp build/run steps, and the deployed Preview contract address. -->
+The contract is live on Midnight Preview at
+`7f4f10067bf78048f362f96081095c0ea47848e885131504c13690c153a8dba5` (block 626075).
+Anyone can confirm that independently, without trusting this repo:
+
+```bash
+curl -s -X POST -H "Content-Type: application/json" \
+  -d '{"query":"{ contractAction(address: \"7f4f10067bf78048f362f96081095c0ea47848e885131504c13690c153a8dba5\") { __typename address transaction { hash block { height } } } }"}' \
+  https://indexer.preview.midnight.network/api/v3/graphql
+```
+
+<!-- TODO(phase-2): attest dApp build/run steps. -->
 
 ### Honest limitations
 

@@ -204,17 +204,25 @@ async function main() {
   // so the real implementations have to be supplied even to deploy.
   // Both combinators must go in ONE pipe() — the value returned by pipe() is
   // not itself pipeable.
+  // One untyped view of the CompiledContract namespace, used for every call in
+  // this block. ContractModule comes from a runtime import() of compiler output,
+  // so its generics are unknown to tsc; each combinator then resolves its own
+  // overloads to `never` and rejects perfectly valid arguments. The assertions
+  // are erased at compile time and change nothing at runtime, and the rest of
+  // the file stays checked — which is the point of having a tsconfig here.
+  const CC: any = CompiledContract;
+
   const witnessCombinator: any =
     CONTRACT_NAME === "practice_attestation"
-      ? CompiledContract.withWitnesses(
+      ? CC.withWitnesses(
           ((await import("../../contract/src/witnesses.ts")) as any).witnesses,
         )
-      : CompiledContract.withVacantWitnesses;
+      : CC.withVacantWitnesses;
 
-  const compiledContract = CompiledContract.make(
-    CONTRACT_NAME,
-    ContractModule.Contract,
-  ).pipe(witnessCombinator, CompiledContract.withCompiledFileAssets(ZK_CONFIG_PATH));
+  const compiledContract: any = CC.make(CONTRACT_NAME, ContractModule.Contract).pipe(
+    witnessCombinator,
+    CC.withCompiledFileAssets(ZK_CONFIG_PATH),
+  );
 
   const zkConfigProvider = new NodeZkConfigProvider<any>(ZK_CONFIG_PATH);
   const providers: any = {
@@ -243,7 +251,10 @@ async function main() {
       : {};
 
   log(`deploying ${CONTRACT_NAME} (proof generation takes 30-60s)...`);
-  const deployed: any = await deployContract(providers, {
+  // deployContract is generic over the contract type, which is unknowable here
+  // for the same reason as CC above: the contract arrives from a runtime import().
+  // Neither overload binds, so the call is made through an untyped alias.
+  const deployed: any = await (deployContract as any)(providers, {
     compiledContract,
     privateStateId: `${CONTRACT_NAME}PrivateState`,
     initialPrivateState,

@@ -34,17 +34,25 @@ async function main() {
   const ContractModule: any = await import(join(ZK_CONFIG_PATH, "contract", "index.js"));
   log("compiled module loaded");
 
+  // One untyped view of the CompiledContract namespace, used for every call in
+  // this block. ContractModule comes from a runtime import() of compiler output,
+  // so its generics are unknown to tsc; each combinator then resolves its own
+  // overloads to `never` and rejects perfectly valid arguments. The assertions
+  // are erased at compile time and change nothing at runtime, and the rest of
+  // the file stays checked — which is the point of having a tsconfig here.
+  const CC: any = CompiledContract;
+
   const witnessCombinator: any =
     CONTRACT_NAME === "practice_attestation"
-      ? CompiledContract.withWitnesses(
+      ? CC.withWitnesses(
           ((await import("../../contract/src/witnesses.ts")) as any).witnesses,
         )
-      : CompiledContract.withVacantWitnesses;
+      : CC.withVacantWitnesses;
 
-  const compiledContract = CompiledContract.make(
-    CONTRACT_NAME,
-    ContractModule.Contract,
-  ).pipe(witnessCombinator, CompiledContract.withCompiledFileAssets(ZK_CONFIG_PATH));
+  const compiledContract: any = CC.make(CONTRACT_NAME, ContractModule.Contract).pipe(
+    witnessCombinator,
+    CC.withCompiledFileAssets(ZK_CONFIG_PATH),
+  );
   log("CompiledContract built (witnesses + file assets attached)");
 
   // Reading the verifier keys is what deployContract does next, and it is where

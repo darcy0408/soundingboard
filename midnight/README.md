@@ -17,7 +17,7 @@ a **Windows 11** machine, because several of the obvious paths are wrong.
 | Proof server | **8.1.0** | Docker Desktop (Linux engine) |
 | Target network | **Preview** | `rpc.preview.midnight.network` |
 
-## Four traps worth knowing about
+## Seven traps worth knowing about
 
 ### 1. `compact update` installs a compiler that is too new
 
@@ -185,6 +185,37 @@ The sync dominates. `InMemoryTransactionHistoryStorage` does not persist sync
 state, so every process start pays it again — worth replacing with a persistent
 store before Phase 2 iterates on deploys.
 
+## Phase 1 result — `practice_attestation` deployed
+
+The Practice Proof attestation contract, compiled with 0.31.1 and deployed to
+Preview on 2026-08-28:
+
+| | |
+|---|---|
+| Contract address | `7f4f10067bf78048f362f96081095c0ea47848e885131504c13690c153a8dba5` |
+| Block height | 626075 |
+| Deploy tx (SDK `txId`) | `0014809326a71b13f66587743a6ac3665ded560a38b9159688a64d79b98f9d2aae` |
+| Tx hash (indexer) | `117e996e684a4497572dd14025be81bd066647c992c945d05ec412dc9d433851` |
+
+Independently confirmed on-chain, rather than trusting the deploy script:
+
+```bash
+curl -s -X POST -H "Content-Type: application/json" \
+  -d '{"query":"{ contractAction(address: \"7f4f10067bf78048f362f96081095c0ea47848e885131504c13690c153a8dba5\") { __typename address transaction { hash block { height } } } }"}' \
+  https://indexer.preview.midnight.network/api/v3/graphql
+# => {"contractAction":{"__typename":"ContractDeploy", ... "block":{"height":626075}}}
+```
+
+This succeeded on the fifth attempt; the four failures and their causes are in
+SESSION_NOTES.md. The pre-flight added after them
+(`npm run check -w sb-phase0-smoke`, ~1s, no wallet) would have caught three of
+the four instantly. **Run it before every deploy.**
+
+**Proving time for `attest` is still unmeasured.** Deploying a contract does not
+execute its circuits, so this deploy says nothing about how long an `attest`
+proof takes — and its prover key is 2.8 MB against the counter's 14 KB. Measure
+it before relying on it on camera.
+
 ## Notes for Phase 2 (attest web dApp)
 
 ### The ~13 min sync does not apply to the dApp
@@ -202,18 +233,33 @@ sub-wallets expose `serializeState()` (write), but `wallet-sdk-shielded` 3.0.1,
 point, and `WalletFacade.init` takes those builders. So for headless scripts
 the mitigation is to keep one long-lived process, not to persist state.
 
-### Carry the ledger-v8 override into every new package
+### The ledger-v8 override lives in the workspace root — and ONLY there
 
 Trap 5 above is not specific to this smoke test. Any package that combines
-`midnight-js-*` with `wallet-sdk-*` gets two copies of the ledger wasm. The
-attest dApp will do exactly that, so start its `package.json` with:
+`midnight-js-*` with `wallet-sdk-*` gets two copies of the ledger wasm, and the
+attest dApp does exactly that.
+
+`midnight/` is an **npm workspace**, so the fix belongs in `midnight/package.json`:
 
 ```json
 "overrides": { "@midnight-ntwrk/ledger-v8": "8.1.0" }
 ```
 
-and verify with `find node_modules -type d -name ledger-v8` before debugging
-anything else.
+**npm honours `overrides` only in the workspace root.** A copy in
+`contract/package.json`, `phase0-smoke/package.json` or `attest-app/package.json`
+is ignored without warning — it reads as protection while providing none. Do not
+add one there.
+
+Verify after any install:
+
+```bash
+find node_modules -type d -name ledger-v8      # expect exactly one hit
+find . -maxdepth 3 -name node_modules -type d  # expect only midnight/node_modules
+```
+
+The second command matters as much as the first: a stray per-package
+`node_modules` re-creates the duplicate-module trap regardless of the override,
+because resolution stops at the first one it finds walking up.
 
 ### Two things that differ from these scripts
 
@@ -264,16 +310,29 @@ submit anything. Doing this early avoids discovering it mid-demo.
 
 ## Layout
 
+`midnight/` is a single npm workspace: one hoisted `node_modules` at the root,
+one `package-lock.json`, one place for the ledger-v8 override. Run `npm install`
+from `midnight/`, never from inside a member package.
+
 ```
 midnight/
+  package.json           workspace root: members + the ledger-v8 override
   README.md              this file
+  contract/              Compact contract + witnesses + 31 tests
+    src/practice_attestation.compact
+    src/witnesses.ts
+    build/               compiler output incl. keys/ (gitignored)
   phase0-smoke/
     contracts/           counter.compact + witnesses.ts (from compact-examples)
     scripts/
       address.ts         print the unshielded faucet address (instant)
       wallet.ts          create/sync a Preview wallet, show balances
-      deploy.ts          sync -> register DUST -> deploy the counter
+      check-contract.ts  ~1s pre-flight; run before every deploy
+      deploy.ts          sync -> register DUST -> deploy
     build/               compiler output (gitignored)
+  attest-app/            Phase 2 web dApp (Vite + React)
+    src/
+    public/zk/           ZK config served to FetchZkConfigProvider (gitignored)
 ```
 
 ## Reproducing Phase 0
@@ -289,13 +348,17 @@ docker run -d --name midnight-proof-server -p 6300:6300 \
   midnightntwrk/proof-server:8.1.0 -- midnight-proof-server -v
 curl -sf http://localhost:6300/health
 
-# 3. Compile the sample contract
-cd midnight/phase0-smoke
+# 3. Install (workspace root — NOT inside a member package)
+cd midnight
+npm install
+
+# 4. Compile the sample contract
+cd phase0-smoke
 compact compile contracts/counter.compact build/counter
 
-# 4. Wallet + funding
-npm install
+# 5. Wallet + funding + deploy
 npx tsx scripts/address.ts   # paste the address into the faucet
+npm run check -w sb-phase0-smoke   # ~1s pre-flight; run before every deploy
 npx tsx scripts/deploy.ts    # sync, register DUST, deploy
 ```
 

@@ -1,0 +1,5 @@
+node_modules/
+dist/
+*.log
+# ZK config (keys/ + zkir/) is copied in from the contract build at dev/build time.
+public/zk/

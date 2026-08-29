@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    // scripts/deploy.ts and scripts/check-contract.ts import the contract's
+    // witnesses by explicit .ts path (`../../contract/src/witnesses.ts`), which
+    // tsx resolves at runtime; tsc needs this flag to follow the same specifier.
+    "allowImportingTsExtensions": true
+  },
+  "include": ["scripts/**/*.ts", "contracts/**/*.ts"],
+  "exclude": ["node_modules", "build"]
+}
