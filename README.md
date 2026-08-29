@@ -140,7 +140,10 @@ attester's help.
 
 **Attesting** loads an exported witness file, validates it, and shows exactly
 what would stay on the device versus what would become public. Submitting from
-the browser needs the Lace extension pointed at Preview.
+the browser is wired for wallet detection and connection only — the
+proof-and-submit path through the Lace extension is written but has never been
+run end to end, because Lace was still pointed at mainnet while this was built.
+The dApp says so in its own UI rather than failing silently.
 
 Submission also runs headlessly, and that is the path the project actually
 exercises — it needs no browser extension:
