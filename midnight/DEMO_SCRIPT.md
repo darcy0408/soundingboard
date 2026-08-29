@@ -12,11 +12,13 @@ leaves a little air. Do not add sentences without cutting others.
 
 The two slow steps will ruin a take if they happen on camera:
 
-- [ ] **Wallet snapshot warm.** Run `npm run attest -w sb-phase0-smoke` once beforehand: the first
-      run pays a ~13 min cold sync and writes a snapshot; every run after it starts in seconds.
-      Never film the cold sync.
-- [ ] **Proof server up** — `curl localhost:6300/ready` returns OK before you start.
-- [ ] **DUST balance confirmed** sufficient for one attest submission.
+- [ ] **Run the pre-flight** — `npm run preflight -w sb-phase0-smoke` (from WSL). One command
+      covers the next four things: it checks the proof server, syncs the wallet and refreshes the
+      snapshot so the take never films a ~13 min cold sync, prints the DUST balance, and reads the
+      contract's ledger back through the indexer. It prints `READY` or the list of problems.
+      It deliberately does **not** submit: `attest` requires a claim strictly greater than the
+      recorded milestone, so a warm-up submission would eat the headroom the demo needs to show
+      the number going up.
 - [ ] **A witness file already exported** and sitting in Downloads, in case the phone leg fails.
       `midnight/contract/test/fixtures/sample-witness.json` is the documented fallback.
 - [ ] App history contains **real completed rehearse sessions** — the count on screen should not

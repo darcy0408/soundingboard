@@ -8,6 +8,7 @@
     "wallet": "tsx scripts/wallet.ts",
     "deploy": "tsx scripts/deploy.ts",
     "attest": "tsx scripts/attest.ts",
+    "preflight": "tsx scripts/preflight.ts",
     "check": "tsx scripts/check-contract.ts",
     "typecheck": "tsc --noEmit"
   },
