@@ -93,7 +93,9 @@ Proof of the work. Not the diary."
 - Narration says "a coach or a program that assigned the practice" rather than naming a clinical
   role — SoundingBoard is positioned as communication practice, never therapy, and that line is
   load-bearing across the whole project. Keep the video consistent with it.
-- If the proof takes more than a few seconds, **cut or speed-ramp** — do not film a spinner.
+- Proving is measured at **2.7 s** (block 632945). That is short enough to film live — no need to
+  cut or speed-ramp the proof itself. The ~20 s that follows is balancing and finalization; cut
+  that.
 - If the on-chain leg fails on the day, the honest fallback is to show the 52 passing contract
   tests plus the already-deployed contract, and say the submission is pending. A real limitation
   stated plainly beats a staged success.

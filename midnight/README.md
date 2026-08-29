@@ -214,10 +214,53 @@ SESSION_NOTES.md. The pre-flight added after them
 (`npm run check -w sb-phase0-smoke`, ~1s, no wallet) would have caught three of
 the four instantly. **Run it before every deploy.**
 
-**Proving time for `attest` is still unmeasured.** Deploying a contract does not
-execute its circuits, so this deploy says nothing about how long an `attest`
-proof takes — and its prover key is 2.8 MB against the counter's 14 KB. Measure
-it before relying on it on camera.
+Proving time for `attest` was unmeasured after this deploy, because deploying a
+contract does not execute its circuits. It has since been measured — see the
+Phase 2 result below. **2.7 seconds.**
+
+## Phase 2 result — attestation submitted and verified
+
+The first real `attest` call, from `npm run attest -w sb-phase0-smoke` against
+the sample witness file:
+
+| | |
+|---|---|
+| Status | `SucceedEntirely` |
+| Block height | 632945 |
+| Call tx (SDK `txId`) | `00694971e69b52649738223e673eaf3e37713471a226972bfce731d99dbbc4ef83` |
+| Tx hash (indexer) | `3f7d357355b8dbf01f5e52c032074bb82491032d355d14365c7ab711759108ad` |
+| On-chain identity | `257f5d2595b77972040d99e3f901fe92056ed6bc7599a9b7559c0d7acabf5327` |
+| Milestone written | 3 |
+
+Measured on this machine:
+
+| Step | Time |
+|---|---|
+| Wallet start from snapshot | seconds (vs ~13 min cold) |
+| **Proof generation for `attest`** | **2.7 s** |
+| Whole call: prove + balance + submit + finalize | 22.7 s |
+
+2.7 s is comfortably inside "film it live" territory, which the 2.8 MB prover key
+had made an open question. Note the other 20 s is balancing, submission and
+waiting for finalization — not proving.
+
+The claim was deliberately **3**, not the 7 the witness file supports. The
+circuit is monotonic, so leaving headroom means the demo can show a real
+milestone increase (3 → 7) rather than a no-op re-attestation.
+
+Independently confirmed on-chain — note `__typename` is now `ContractCall`,
+where before the attestation it was `ContractDeploy`:
+
+```bash
+curl -s -X POST -H "Content-Type: application/json" \
+  -d '{"query":"{ contractAction(address: \"7f4f10067bf78048f362f96081095c0ea47848e885131504c13690c153a8dba5\") { __typename address transaction { hash block { height } } } }"}' \
+  https://indexer.preview.midnight.network/api/v3/graphql
+# => {"contractAction":{"__typename":"ContractCall", ... "block":{"height":632945}}}
+```
+
+The attest dApp reads the same entry out of the indexer and renders it, with no
+wallet and no extension involved — which is the point. That read is what a third
+party performs, and it needs nothing from the person who made the attestation.
 
 ## Six more traps, found building the dApp and the attest script
 

@@ -156,6 +156,25 @@ then re-reads the ledger through the indexer to show the receipt. The witness
 values never leave the machine — using Midnight's hosted proof server would hand
 them to a third party, so the proof server URL is not configurable in the dApp.
 
+### It works, and here is the receipt
+
+The first attestation is on Preview:
+
+| | |
+|---|---|
+| Status | `SucceedEntirely` |
+| Block | 632945 |
+| Tx hash | `3f7d357355b8dbf01f5e52c032074bb82491032d355d14365c7ab711759108ad` |
+| On-chain identity | `257f5d2595b77972040d99e3f901fe92056ed6bc7599a9b7559c0d7acabf5327` |
+| Milestone | 3 |
+| **Proof generation** | **2.7 s** |
+
+Re-run the `curl` above and `__typename` now comes back `ContractCall` rather
+than `ContractDeploy`. That one map entry — a hash and the number 3 — is the
+contract's entire public footprint. The transcripts, the scores, the scenarios,
+the timestamps, and even how many sessions actually exist are all still only on
+the device.
+
 ### Honest limitations
 
 **Commitments are generated on-device.** The circuit proves they are *distinct*; it cannot prove they correspond to real practice sessions. A determined user could fabricate ten values and attest to a milestone they did not earn.
