@@ -1,0 +1,13 @@
+{
+  "_comment": "Single source of truth for the deployed Practice Proof contract. Read by phase0-smoke/scripts/attest.ts and by attest-app. Update this file, not the copies in the READMEs.",
+  "network": "preview",
+  "contract": "practice_attestation",
+  "address": "7f4f10067bf78048f362f96081095c0ea47848e885131504c13690c153a8dba5",
+  "deployTxId": "0014809326a71b13f66587743a6ac3665ded560a38b9159688a64d79b98f9d2aae",
+  "deployTxHash": "117e996e684a4497572dd14025be81bd066647c992c945d05ec412dc9d433851",
+  "blockHeight": 626075,
+  "indexer": {
+    "http": "https://indexer.preview.midnight.network/api/v3/graphql",
+    "ws": "wss://indexer.preview.midnight.network/api/v3/graphql/ws"
+  }
+}

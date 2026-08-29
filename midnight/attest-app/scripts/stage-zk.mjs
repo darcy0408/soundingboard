@@ -25,6 +25,17 @@ if (!(await exists(BUILD))) {
   process.exit(1);
 }
 
+// src/lib/ledger.ts imports the generated `ledger()` decoder straight from the
+// compiler output. Missing, it fails as a Vite resolve error pointing at a path
+// inside another package, which reads like a broken import rather than a missing
+// build step.
+const CONTRACT_MODULE = join(BUILD, "contract", "index.js");
+if (!(await exists(CONTRACT_MODULE))) {
+  console.error(`[stage-zk] no compiled contract module at ${CONTRACT_MODULE}`);
+  console.error("[stage-zk] run `npm run build -w sb-practice-attestation` from midnight/ first.");
+  process.exit(1);
+}
+
 for (const dir of ["keys", "zkir"]) {
   const from = join(BUILD, dir);
   if (!(await exists(from))) {
