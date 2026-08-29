@@ -22,12 +22,26 @@ The two slow steps will ruin a take if they happen on camera:
 - [ ] **A witness file already exported** and sitting in Downloads, in case the phone leg fails.
       `midnight/contract/test/fixtures/sample-witness.json` is the documented fallback.
 - [ ] App history contains **real completed rehearse sessions** — the count on screen should not
-      be 1. Seven or eight looks like use; one looks like a fixture.
+      be 1. The sample witness holds seven real commitments, so seven is the number the narration says; one looks like a fixture.
 - [ ] Browser: **notifications off**, bookmarks bar hidden, one clean profile window.
 - [ ] Phone: **do not disturb on**, screen recording ready, battery/notification bar tidy.
 - [ ] Decide the identity you will show on-chain and **do not show any wallet seed on screen.**
 
 Record the phone leg and the desktop leg separately, then cut together. Don't try for one take.
+
+**Claim 7 on camera.** The chain records milestone 3 and `attest` only accepts a strictly higher
+number, so anything ≤ 3 is rejected by the circuit. The sample witness carries seven real
+commitments, so 7 is both valid and visibly an increase:
+
+```bash
+SB_CLAIMED=7 npm run attest -w sb-phase0-smoke
+```
+
+**A scrolling teleprompter of this script** lives at `~/Desktop/soundingboard-teleprompter.html`
+(open in Chrome). It splits the two legs into timed acts — 60 s phone, 54 s desktop — with a
+countdown, a running clock, and an automatic stop between them so the two clips can be joined end
+to end without overlay editing. It carries the same narration as the beats below; edit both or
+neither.
 
 ---
 
@@ -47,10 +61,10 @@ now you had to pick one."
 
 "Here's a finished session. Clarity, composure, assertiveness, with the moments quoted back.
 
-This is the part that's new. Practice Proof — eight sessions ready to prove.
+This is the part that's new. Practice Proof — seven sessions ready to prove.
 
 Each completed session becomes a salted hash, derived on the phone. The transcript is never an
-input to anything that leaves the device. Export gives me a witness file: my key, and eight
+input to anything that leaves the device. Export gives me a witness file: my key, and seven
 commitments.
 
 Proving can't run in the app — React Native has no WebAssembly — so the phone hands off to a
@@ -79,7 +93,7 @@ receipt rather than a claim."
 
 > *Visual: side-by-side — the on-chain entry vs. the phone.*
 
-"On-chain: a hash, and the number eight.
+"On-chain: a hash, and the number seven.
 
 Still on the phone: every transcript, every score, who each conversation was with, and whether
 any particular session ever happened.
