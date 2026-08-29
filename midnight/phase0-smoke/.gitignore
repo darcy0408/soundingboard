@@ -6,3 +6,4 @@ wallet.json
 .wallet/
 # levelPrivateStateProvider runtime state, not source.
 midnight-level-db/
+practice-proof-level-db/

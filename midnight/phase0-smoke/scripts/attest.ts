@@ -149,6 +149,14 @@ async function main() {
 
   const providers: any = {
     privateStateProvider: levelPrivateStateProvider({
+      // A DATABASE of its own, not just a store name.
+      //
+      // The encryption record is per-database, and deploy.ts created the default
+      // `midnight-level-db` under a different password. Sharing it makes this
+      // script fail with `DOMException [OperationError]: Cipher job failed` out
+      // of an AES job — an error that names no password and no file, and looks
+      // like data corruption rather than the key mismatch it is.
+      midnightDbName: "practice-proof-level-db",
       privateStateStoreName: "sb-practice-proof",
       // Encrypts the LOCAL LevelDB that caches private state. It is not a
       // credential to any service, and it guards a store whose contents the

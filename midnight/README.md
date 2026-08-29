@@ -17,7 +17,7 @@ a **Windows 11** machine, because several of the obvious paths are wrong.
 | Proof server | **8.1.0** | Docker Desktop (Linux engine) |
 | Target network | **Preview** | `rpc.preview.midnight.network` |
 
-## Seven traps worth knowing about
+## Seven traps worth knowing about (Phase 0/1)
 
 ### 1. `compact update` installs a compiler that is too new
 
@@ -97,8 +97,11 @@ consequences baked into the scripts here:
 - `scripts/deploy.ts` does sync → DUST registration → deploy in a single run,
   so the 15-minute sync is paid once.
 
-Also note `InMemoryTransactionHistoryStorage` means sync state is not persisted
-between runs.
+`InMemoryTransactionHistoryStorage` means sync state is not persisted by the
+SDK between runs — but it **can** be persisted by the caller, and now is. See
+"The ~13 min sync does not apply to the dApp" below: `scripts/wallet-session.ts`
+snapshots all three sub-wallets after sync and restores from that, so only the
+first run pays this. `deploy.ts` predates it and still syncs cold every time.
 
 ### 5. Two copies of the ledger wasm module (the expensive one)
 
@@ -176,7 +179,7 @@ Measured timings on this machine, for planning Phase 2:
 
 | Step | Time |
 |---|---|
-| First wallet sync (every run — not persisted) | ~13 min |
+| First wallet sync (cold, no snapshot) | ~13 min |
 | DUST registration | seconds; fee of **1**, self-funding |
 | DUST accrual after registration | effectively immediate |
 | Deploy incl. proof generation | < 1 min |
@@ -215,6 +218,107 @@ the four instantly. **Run it before every deploy.**
 execute its circuits, so this deploy says nothing about how long an `attest`
 proof takes — and its prover key is 2.8 MB against the counter's 14 KB. Measure
 it before relying on it on camera.
+
+## Six more traps, found building the dApp and the attest script
+
+None of these announce what is actually wrong. Each one cost real time.
+
+### 8. `vite-plugin-top-level-await` breaks under Vite 8
+
+Every Midnight browser guide pairs `vite-plugin-wasm` with it. Against Vite 8 the
+build dies in `generateBundle`:
+
+```
+[plugin vite-plugin-top-level-await]
+Error: missing field `type`
+    at Compiler.printSync (@swc/core/index.js:257:29)
+```
+
+The plugin rewrites top-level await through SWC, and Vite 8's bundler is
+**rolldown**, not rollup, so the chunk it is handed is not the shape it expects.
+
+**Remove it.** It only exists to downlevel TLA for targets that cannot run it,
+and `build.target: "esnext"` keeps TLA natively. `vite-plugin-wasm` alone is
+enough — both wasm modules emit correctly (`midnight_ledger_wasm_bg` ~10 MB,
+`midnight_onchain_runtime_wasm_bg` ~1.3 MB).
+
+### 9. Excluding a wasm package from pre-bundling also excludes its CJS deps
+
+`optimizeDeps.exclude` on `@midnight-ntwrk/compact-runtime` is required (trap 5).
+But it excludes everything underneath it too, and `object-inspect` is CommonJS.
+Served raw as native ESM in dev, the page goes blank with:
+
+```
+SyntaxError: The requested module '/@fs/.../object-inspect/index.js'
+does not provide an export named 'default'
+```
+
+**Dev only** — the production bundler does its own CJS interop, so `npm run
+build` passes while `npm run dev` is broken. Fix by pre-bundling that one leaf:
+
+```ts
+optimizeDeps: {
+  exclude: ["@midnight-ntwrk/ledger-v8", "@midnight-ntwrk/compact-runtime", ...],
+  include: ["@midnight-ntwrk/compact-runtime > object-inspect"],
+}
+```
+
+The `parent > child` form is required. A bare `"object-inspect"` is silently
+ignored, because nothing in the app's own import graph names it.
+
+### 10. Vite sees no file changes on /mnt/c
+
+Editing from Windows while the dev server runs in WSL means the source is on a
+drvfs mount, which delivers no inotify events. No HMR fires, and a full reload
+still serves the module Vite transformed at startup — so an edit appears to have
+no effect and it reads like a browser cache problem. It is not.
+
+```ts
+server: { watch: { usePolling: true, interval: 300 } }
+```
+
+### 11. `indexerPublicDataProvider`'s WebSocket default is `undefined` in a browser
+
+Its third parameter defaults to the node `ws` package, which bundles to
+`isomorphic-ws/browser.js` — a file that exports no `WebSocket`. The build says
+so and is easy to scroll past:
+
+```
+[IMPORT_IS_UNDEFINED] Import `WebSocket` will always be undefined
+```
+
+Pass the browser's own: `indexerPublicDataProvider(http, ws, globalThis.WebSocket)`.
+Plain queries survive without it; subscriptions would not.
+
+### 12. The private-state password needs 3 of 4 character classes
+
+`levelPrivateStateProvider` accepts any password at configuration time and
+validates it later, from inside `findDeployedContract`:
+
+```
+PasswordValidationError: Password must contain at least 3 of: uppercase
+letters, lowercase letters, digits, special characters. Found: 2
+{ reason: 'insufficient_classes' }
+```
+
+Note `deploy.ts` uses `"phase0-smoke-test"` (2 classes) and works — `deployContract`
+never reads the store, so it never validates. Only the `findDeployedContract`
+path does.
+
+### 13. The private-state DB is encrypted per DATABASE, not per store name
+
+Giving a script its own `privateStateStoreName` is **not** enough to isolate it.
+Two scripts with different passwords and the default `midnightDbName` open the
+same database, and the second fails decrypting the first one's encryption record:
+
+```
+DOMException [OperationError]: The operation failed for an operation-specific reason
+  [cause]: [Error: Cipher job failed]
+```
+
+That error names no password, no key and no file — it reads like corruption.
+Set `midnightDbName` per script (`attest.ts` uses `practice-proof-level-db`) and
+gitignore the directory it creates.
 
 ## Notes for Phase 2 (attest web dApp)
 
