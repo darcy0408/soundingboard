@@ -41,5 +41,13 @@ export default defineConfig({
   plugins: [react(), wasm()],
   optimizeDeps: { exclude: MIDNIGHT_WASM, include: CJS_DEPS },
   build: { target: "esnext" },
-  server: { port: 5173 },
+  server: {
+    port: 5173,
+    // This repo is edited from Windows while the toolchain runs in WSL, so the
+    // source lives on /mnt/c — a drvfs mount that does not deliver inotify
+    // events. Without polling the dev server never sees a save: no HMR, and
+    // even a full reload keeps serving the module it transformed at startup,
+    // which looks like a browser cache problem and is not one.
+    watch: { usePolling: true, interval: 300 },
+  },
 });

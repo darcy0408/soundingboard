@@ -12,7 +12,9 @@ leaves a little air. Do not add sentences without cutting others.
 
 The two slow steps will ruin a take if they happen on camera:
 
-- [ ] **Wallet already synced**, and sync state persisted to disk. A cold sync is ~15 minutes.
+- [ ] **Wallet snapshot warm.** Run `npm run attest -w sb-phase0-smoke` once beforehand: the first
+      run pays a ~13 min cold sync and writes a snapshot; every run after it starts in seconds.
+      Never film the cold sync.
 - [ ] **Proof server up** — `curl localhost:6300/ready` returns OK before you start.
 - [ ] **DUST balance confirmed** sufficient for one attest submission.
 - [ ] **A witness file already exported** and sitting in Downloads, in case the phone leg fails.
@@ -55,18 +57,21 @@ secrets, the browser does the maths."
 
 ## 1:05–1:45 — The proof and the chain (~100 words)
 
-> *Visual: dApp → load witness → connect wallet → prove → submit → block explorer / indexer.*
+> *Visual, in three beats — do NOT try to do this through the wallet extension on camera:*
+> 1. *dApp → load the witness file → the "stays on your device / becomes public" split.*
+> 2. *terminal → `npm run attest -w sb-phase0-smoke` → proving time, then the tx.*
+> 3. *back to the dApp → refresh → the new row appears in the public record.*
 
-"The dApp loads that file, connects my wallet, and generates a zero-knowledge proof against a
-local proof server.
+"The dApp loads that file and shows me exactly what it's about to disclose, and what it isn't.
 
-The circuit checks four things: the claim is in range, no slot is empty, all eight commitments
-are distinct, and the number goes up — so an old proof can't be replayed downward.
+The proof runs against a local proof server — the witness values never go to anyone else's
+machine. The circuit checks four things: the claim is in range, no slot is empty, the
+commitments are distinct, and the number goes up, so an old proof can't be replayed downward.
 
-Submitted to Midnight Preview. And here it is on-chain.
+Submitted to Midnight Preview. Now watch — I reload the page, and there it is.
 
-That's the whole public record. One identity hash, one number. Anyone can read it and verify the
-milestone — no special tooling, it's just a public map."
+That read needs no wallet and no permission from me. It's a public map. That's what makes it a
+receipt rather than a claim."
 
 ## 1:45–2:00 — What's public, what isn't (~38 words)
 
@@ -89,5 +94,9 @@ Proof of the work. Not the diary."
   role — SoundingBoard is positioned as communication practice, never therapy, and that line is
   load-bearing across the whole project. Keep the video consistent with it.
 - If the proof takes more than a few seconds, **cut or speed-ramp** — do not film a spinner.
-- If the on-chain leg fails on the day, the honest fallback is to show the 31 passing contract
-  tests and say the deploy is pending. A real limitation stated plainly beats a staged success.
+- If the on-chain leg fails on the day, the honest fallback is to show the 52 passing contract
+  tests plus the already-deployed contract, and say the submission is pending. A real limitation
+  stated plainly beats a staged success.
+- **Do not demo the browser Connect-wallet button.** Submission through the Lace extension is
+  written but has never been run end to end — Lace was still on mainnet when this was built. The
+  headless `attest` script is the proven path, and the three-beat cut above uses it.

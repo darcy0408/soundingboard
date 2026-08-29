@@ -150,7 +150,17 @@ async function main() {
   const providers: any = {
     privateStateProvider: levelPrivateStateProvider({
       privateStateStoreName: "sb-practice-proof",
-      privateStoragePasswordProvider: () => "practice-proof-local",
+      // Encrypts the LOCAL LevelDB that caches private state. It is not a
+      // credential to any service, and it guards a store whose contents the
+      // witness file already holds in the clear — so a default in the repo
+      // gives nothing away. It is overridable for anyone who wants their own.
+      //
+      // midnight-js requires 3 of 4 character classes and rejects anything
+      // weaker with PasswordValidationError { reason: 'insufficient_classes' },
+      // raised from inside findDeployedContract rather than at configuration
+      // time. Keep any replacement mixed-case with a digit.
+      privateStoragePasswordProvider: () =>
+        process.env.SB_PRIVATE_STATE_PASSWORD ?? "PracticeProof-local-1",
       accountId: session.keystore.getBech32Address().toString(),
     }),
     publicDataProvider: indexerPublicDataProvider(INDEXER_HTTP, INDEXER_WS),

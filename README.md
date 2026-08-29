@@ -103,7 +103,7 @@ The Compact toolchain runs under WSL or Linux. Versions are pinned deliberately:
 cd midnight            # npm workspace root — install here, not in a member package
 npm install
 npm run build -w sb-practice-attestation   # compiler 0.31.1, incl. PLONK key generation (~7 s)
-npm test  -w sb-practice-attestation       # 31 tests
+npm test  -w sb-practice-attestation       # 52 tests
 ```
 
 The suite covers the circuit (claim bounds, padding rejection, the mask boundary from both sides, monotonicity, identity isolation, and the privacy invariants) and the **witness file format** that crosses the app → dApp → circuit seam, where nothing type-checks. `midnight/contract/test/fixtures/sample-witness.json` is generated with the exact derivation in `app/src/lib/practiceProof.ts`, so it is what the app really emits rather than hand-written hex — and it doubles as a standalone demo input.
@@ -120,7 +120,41 @@ curl -s -X POST -H "Content-Type: application/json" \
   https://indexer.preview.midnight.network/api/v3/graphql
 ```
 
-<!-- TODO(phase-2): attest dApp build/run steps. -->
+### The attest dApp
+
+A small Vite + React page that does two separate jobs. Both need the contract
+built first, because it imports the generated ledger decoder and serves the
+proving keys as static assets.
+
+```bash
+cd midnight
+npm run build -w sb-practice-attestation   # required: produces keys/, zkir/ and the decoder
+npm run dev   -w sb-attest-app             # http://localhost:5173
+```
+
+**Verifying** needs nothing else — no wallet, no extension, no proof server. The
+page reads the contract's `milestones` map straight from the Preview indexer and
+shows every attestation on it. That is the property worth demonstrating: a
+receipt only means something if a third party can check it without the
+attester's help.
+
+**Attesting** loads an exported witness file, validates it, and shows exactly
+what would stay on the device versus what would become public. Submitting from
+the browser needs the Lace extension pointed at Preview.
+
+Submission also runs headlessly, and that is the path the project actually
+exercises — it needs no browser extension:
+
+```bash
+# uses midnight/contract/test/fixtures/sample-witness.json by default
+npm run attest -w sb-phase0-smoke
+SB_WITNESS_FILE=/path/to/exported.json SB_CLAIMED=5 npm run attest -w sb-phase0-smoke
+```
+
+It proves the circuit against the **local** proof server on `:6300`, submits,
+then re-reads the ledger through the indexer to show the receipt. The witness
+values never leave the machine — using Midnight's hosted proof server would hand
+them to a third party, so the proof server URL is not configurable in the dApp.
 
 ### Honest limitations
 

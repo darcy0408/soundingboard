@@ -220,5 +220,13 @@ export async function openSession(): Promise<Session> {
     }
   };
 
+  // Snapshot as soon as the wallet is synced, BEFORE returning to the caller.
+  //
+  // Waiting until the caller finishes throws the sync away whenever anything
+  // downstream fails — which is exactly when it is most expensive. The first
+  // attest run lost a full 13-minute sync to a password-policy error raised
+  // seconds after this point.
+  await save();
+
   return { wallet, address, keystore, shieldedSecretKeys, dustSecretKey, save };
 }

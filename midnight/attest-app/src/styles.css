@@ -313,3 +313,10 @@ footer dd {
 footer a {
   color: var(--accent);
 }
+
+.wallets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 4px;
+}

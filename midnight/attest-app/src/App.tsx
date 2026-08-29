@@ -3,6 +3,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { CONTRACT_ADDRESS, DEPLOYMENT, EXPLORER, PROOF_SERVER } from "./lib/config";
 import { readMilestones, type Milestone } from "./lib/ledger";
 import {
+  connectWallet,
+  detectWallets,
+  type ConnectionResult,
+  type DetectedWallet,
+} from "./lib/lace";
+import {
   assertClaimable,
   parseWitnessFile,
   realCommitmentCount,
@@ -208,20 +214,87 @@ function WitnessInspector() {
             {claimError && <p className="error">{claimError}</p>}
           </div>
 
-          <div className="submit-row">
-            <button className="primary" disabled>
-              Connect wallet &amp; submit
-            </button>
-            <p className="fine">
-              Browser submission needs the Lace extension pointed at Preview. The same
-              proof-and-submit flow runs headlessly today — see{" "}
-              <span className="mono">npm run attest -w sb-phase0-smoke</span>, which is
-              what produced the entries above.
-            </p>
-          </div>
+          <WalletStatus />
         </>
       )}
     </section>
+  );
+}
+
+/**
+ * Reports whether a Midnight wallet is present and what network it connected on.
+ *
+ * Not a submit button. Submission through the extension is not implemented — see
+ * lib/lace.ts for why — and a button that connects but cannot finish would be
+ * worse than none. What this does answer is the question that actually blocks
+ * the browser path: is a wallet installed, and is it on Preview rather than
+ * mainnet, which is where Lace starts.
+ */
+function WalletStatus() {
+  const [wallets, setWallets] = useState<DetectedWallet[]>([]);
+  const [result, setResult] = useState<ConnectionResult | undefined>();
+  const [error, setError] = useState<string | undefined>();
+  const [busy, setBusy] = useState(false);
+
+  // Extensions inject themselves after load, so one read on mount finds nothing.
+  useEffect(() => {
+    let tries = 0;
+    const id = setInterval(() => {
+      const found = detectWallets();
+      if (found.length > 0 || ++tries > 10) {
+        setWallets(found);
+        clearInterval(id);
+      }
+    }, 200);
+    return () => clearInterval(id);
+  }, []);
+
+  const onConnect = async (key: string) => {
+    setBusy(true);
+    setError(undefined);
+    try {
+      setResult(await connectWallet(key));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="submit-row">
+      <h3>Submitting</h3>
+      {wallets.length === 0 ? (
+        <p className="fine">No Midnight wallet extension detected in this browser.</p>
+      ) : (
+        <div className="wallets">
+          {wallets.map((w) => (
+            // A wallet may inject several API versions under different keys, so
+            // the key is shown too — otherwise two buttons read identically.
+            <button key={w.key} onClick={() => void onConnect(w.key)} disabled={busy}>
+              {busy ? "connecting…" : `Check ${w.name} · ${w.key} · API ${w.apiVersion}`}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {error && <p className="error">{error}</p>}
+
+      {result && (
+        <p className="fine">
+          Connected on <strong>{DEPLOYMENT.network}</strong>. Address{" "}
+          <span className="mono">{result.address}</span>. DUST{" "}
+          <strong>{result.dust.toString()}</strong>
+          {result.dust === 0n && " — zero, so this wallet cannot pay a submission fee yet; its NIGHT still needs registering for DUST."}
+        </p>
+      )}
+
+      <p className="fine">
+        Submission from the browser is <strong>not implemented</strong>. The proof-and-submit
+        flow runs headlessly instead — <span className="mono">npm run attest -w sb-phase0-smoke</span>{" "}
+        — which is what wrote the entries above, and it needs no extension.
+      </p>
+    </div>
   );
 }
 

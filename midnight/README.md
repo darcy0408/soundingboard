@@ -225,13 +225,36 @@ belongs to the **headless** `WalletFacade` path used by these scripts. The web
 dApp connects to the **Lace browser extension** through the DApp Connector API
 (`connect("preview")`), and the extension maintains its own sync continuously.
 
-It also cannot be fixed on the headless side with the current SDK. The
-sub-wallets expose `serializeState()` (write), but `wallet-sdk-shielded` 3.0.1,
-`-dust-wallet` 4.1.0 and `-unshielded-wallet` 3.1.0 only offer
-`startWithSeed` / `startWithSecretKeys` / `startWithSecretKey` /
-`startWithPublicKey` as builders — there is no restore-from-serialized entry
-point, and `WalletFacade.init` takes those builders. So for headless scripts
-the mitigation is to keep one long-lived process, not to persist state.
+**It is also fixed on the headless side now** — an earlier draft of this file
+said it could not be, which was wrong. All three sub-wallet classes do expose a
+`restore(serializedState)` builder alongside `startWith*`, matching the
+`serializeState(): Promise<string>` on the instance:
+
+| package | version | builders |
+| --- | --- | --- |
+| `wallet-sdk-shielded` | 3.0.1 | `startWithSeed`, `startWithSecretKeys`, **`restore`** |
+| `wallet-sdk-dust-wallet` | 4.1.0 | `startWithSeed`, `startWithSecretKey`, **`restore`** |
+| `wallet-sdk-unshielded-wallet` | 3.1.0 | `startWithPublicKey`, **`restore`** |
+
+`WalletFacade` exposes neither method, which is what made this look impossible;
+the wallet instances have to be captured from the `init` callbacks that build
+them. `scripts/wallet-session.ts` does that, and a second run of `attest` skips
+the rescan entirely.
+
+Two things learned the hard way while building it:
+
+- **Snapshot the moment sync completes, not when the script finishes.** The
+  first attest run synced for 13 minutes and then died on a password policy
+  error a few seconds later, discarding the whole sync because `save()` had not
+  been reached yet.
+- **A snapshot the SDK rejects must not be fatal.** `restore()` throws from
+  inside a `WalletFacade.init` callback, which fails `init` as a whole, so
+  `openSession` catches that and retries cold. A stale snapshot then costs a
+  resync rather than a dead script on the morning of a deadline.
+
+The snapshot is written to `~/.midnight-soundingboard/preview-wallet-state.json`
+(mode 0600), beside the seed and **outside this public repo**. Delete it, or set
+`SB_WALLET_NO_CACHE=1`, to force a cold sync.
 
 ### The ledger-v8 override lives in the workspace root — and ONLY there
 
@@ -317,23 +340,35 @@ from `midnight/`, never from inside a member package.
 ```
 midnight/
   package.json           workspace root: members + the ledger-v8 override
+  deployment.json        the deployed address — single source of truth
   README.md              this file
-  contract/              Compact contract + witnesses + 31 tests
+  contract/              Compact contract + witnesses + 52 tests
     src/practice_attestation.compact
     src/witnesses.ts
+    src/witness-file.ts  the exported-file format, shared by BOTH readers
     build/               compiler output incl. keys/ (gitignored)
-  phase0-smoke/
-    contracts/           counter.compact + witnesses.ts (from compact-examples)
+  phase0-smoke/          headless scripts (the name is historical — it began as
+    contracts/           the Phase 0 toolchain smoke test and grew into the CLI)
+      counter.compact + witnesses.ts (from compact-examples)
     scripts/
       address.ts         print the unshielded faucet address (instant)
       wallet.ts          create/sync a Preview wallet, show balances
       check-contract.ts  ~1s pre-flight; run before every deploy
+      wallet-session.ts  wallet boot + sync snapshot/restore
       deploy.ts          sync -> register DUST -> deploy
+      attest.ts          witness file -> prove -> submit -> read receipt back
     build/               compiler output (gitignored)
   attest-app/            Phase 2 web dApp (Vite + React)
-    src/
+    src/lib/config.ts    reads ../../deployment.json
+    src/lib/ledger.ts    reads milestones from the indexer — no wallet needed
+    src/lib/witness.ts   re-export of contract/src/witness-file.ts
     public/zk/           ZK config served to FetchZkConfigProvider (gitignored)
 ```
+
+The witness-file format lives in `contract/src/witness-file.ts` rather than in
+either consumer, because both the headless script and the browser dApp read it
+and a second copy would drift. The circuit is the real enforcement; that module
+only turns a proof that would fail deep inside wasm into a legible sentence.
 
 ## Reproducing Phase 0
 
