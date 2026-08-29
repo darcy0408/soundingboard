@@ -129,6 +129,49 @@ session owns its own handoff and this entry does not attempt to describe its int
 - Two sessions were committing to this working tree in parallel throughout. Always `git fetch` and
   re-check `git status` before committing, and stage paths individually — never `git add -A`.
 
+**Addendum — the emulator kept dying, and why (written at session close):**
+
+The Android emulator shut down three separate times during this block, each time within a minute or
+two of being reported as up and ready. It looked like flakiness or like the user closing it; it was
+neither, after the first occasion.
+
+**Cause:** the emulator was being started from inside a harness background task, which made the
+`emulator.exe` process a child of that task's shell. Whenever the task was cleaned up, the emulator
+was reaped along with it. The Metro bundler launched the same way survived every time, which is what
+made the pattern confusing — `npx`/node detaches its own child differently, so Metro outlived its
+wrapper while the emulator did not.
+
+**Fix, and the way to start it in future:** launch it as an independent OS process instead, so it is
+not parented to the session at all:
+
+```powershell
+Start-Process -FilePath "$env:LOCALAPPDATA\Android\Sdk\emulator\emulator.exe" `
+  -ArgumentList "-avd","m1demo","-no-snapshot-load","-no-boot-anim","-gpu","host" -WindowStyle Minimized
+```
+
+`-no-snapshot-load` (cold boot) is the part that avoids the "System UI isn't responding" dialog that
+blocked the 2026-07-13 session; keep it.
+
+**Live processes left running deliberately at session close.** Both are detached and will NOT stop
+when this session ends. Whoever picks this up should close them when finished with them:
+
+| What | PID at close | Notes |
+|---|---|---|
+| Android emulator (`qemu-system-x86_64.exe`, AVD `m1demo`) | 156812 | Window minimized. Stop with `adb emu kill`. |
+| Metro bundler (`node.exe`, port 8081) | 139708 | Survived several task cleanups. If a restart ever reports "Port 8081 is being used by another process", this is why — find the PID with `netstat -ano \| findstr :8081` and kill it before restarting. |
+
+The emulator is left in a **film-ready** state: the debug APK is installed, `adb reverse tcp:8081
+tcp:8081` is set, the seeded practice history contains eight completed rehearse sessions, and the
+Practice Proof screen renders "8 of 10 sessions ready to prove" with no JavaScript errors. The seeded
+data lives on the AVD's disk, so it survives a shutdown — restarting the emulator does not require
+re-seeding or rebuilding, only a boot.
+
+**Re-verified at session close:** `npx tsc --noEmit` and `npx expo lint` both clean in `app/`. No
+code changed after the checks. A parallel session landed commit `fed317c` ("Record-day pre-flight")
+during this block; its earlier in-flight work in `midnight/phase0-smoke/` is now committed by that
+session and was never touched here.
+
+
 ## 2026-08-29 — Practice Proof screen verified on a real Android runtime; on-chain verification path built; device-ID cache fix
 
 Session ran in parallel with another that was converting `midnight/` into an npm workspace. **This
