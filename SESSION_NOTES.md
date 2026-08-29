@@ -21,9 +21,13 @@ All work on branch `midnight-hackathon` (branched from `master`; nothing merged 
 - Kept the Phase 0 smoke test in the repo as a working reference deploy rather than deleting it, since it is the only end-to-end-verified path we have.
 
 **Next:**
-1. **Check the result of the in-flight `practice_attestation` deploy** — it was still running when this session closed (see Risks). If it failed, the log is `/tmp/pa-deploy.log` inside WSL. Re-run with:
-   `cd midnight/phase0-smoke && SB_CONTRACT_NAME=practice_attestation SB_CONTRACT_DIR=../contract/build/practice_attestation npx tsx scripts/deploy.ts`
-   (Requires Docker running for the proof server, and ~15 minutes of wallet sync.)
+1. **Deploy `practice_attestation` — NOT yet deployed.** Three separate failures were diagnosed and fixed after the notes above were first written (see the addendum at the end of this entry); the final attempt was stopped before it finished, so the contract is still not on-chain. Always run the fast pre-flight first, then the deploy:
+   ```
+   cd midnight/phase0-smoke
+   SB_CONTRACT_NAME=practice_attestation SB_CONTRACT_DIR=build/practice_attestation npx tsx scripts/check-contract.ts   # ~1s, no wallet
+   SB_CONTRACT_NAME=practice_attestation SB_CONTRACT_DIR=build/practice_attestation npx tsx scripts/deploy.ts           # ~15 min
+   ```
+   Note `SB_CONTRACT_DIR=build/practice_attestation` (the copy inside `phase0-smoke`), **not** `../contract/build/...` — see the addendum for why that distinction matters. Requires Docker running for the proof server.
 2. **Phase 2: scaffold the attest web dApp** in `midnight/attest-app/` using the `midnight-dapp-dev` plugin. Start its `package.json` with the `ledger-v8` overrides block above. Use `FetchZkConfigProvider` (browser fetches ZK config over HTTP) rather than the `NodeZkConfigProvider` the headless scripts use, which means the compiled `keys/` and `zkir/` output must be served as static assets.
 3. Build the dApp against the headless wallet path first so the demo never hard-depends on Lace, then try the DApp Connector's own `connect("preview")` against the main Lace extension — it may select the network itself regardless of Lace's settings panel.
 4. Phase 3 app integration (`app/src/lib/practiceProof.ts` and the proof screen) — not started.
@@ -35,13 +39,30 @@ All work on branch `midnight-hackathon` (branched from `master`; nothing merged 
 - Demo video (2 minute hard cap) must be recorded Saturday.
 
 **Risks/unverified:**
-- **The `practice_attestation` deploy was still in flight at session close and its result is UNKNOWN.** Do not assume the contract is live. The counter deploy is the only on-chain deploy actually confirmed.
+- **`practice_attestation` is NOT deployed.** Four attempts, none successful; the last was stopped early. The counter deploy remains the only on-chain deploy actually confirmed. Details in the addendum below.
 - **Proving time for `attest` has never been measured.** Its prover key is 2.8 MB against the counter's 14 KB, reflecting the circuit's 45 pairwise commitment comparisons. The counter proved in well under a minute; `attest` will be slower by an unknown factor. This matters for a live demo — measure it before relying on it on camera.
 - **Lace Beta (`hgeekaiplokcnmakghbdfbgnlfheichg`) is deprecated and its sync is broken** — it reached 50%, then reset to 0% and stayed there, and could not build a transaction. Preview itself was healthy at the time (indexer and node both advancing), so the fault is the extension. Midnight support has moved to the main Lace extension, whose store listing still describes only Cardano and never mentions Midnight. The official Midnight docs still point at the deprecated Beta. Expect to fight this.
 - **Every headless script run pays a ~13 minute wallet sync.** `InMemoryTransactionHistoryStorage` does not persist sync state, and there is no restore-from-serialized entry point in this SDK version: the sub-wallets expose `serializeState()` but only `startWithSeed`/`startWithSecretKeys`/`startWithSecretKey`/`startWithPublicKey` as builders. The only headless mitigation is a long-lived process. This does not affect the browser dApp, which uses the extension's own sync.
 - Wallet SDK patterns came from a plugin skill last verified 2026-06-02; the published package versions still match its lockfile exactly, so no drift was observed, but the indexer API version differs between sources (docs say v4, the skill's examples say v3 — both are live and both work).
 - The Phase 0 smoke test writes a `midnight-level-db/` directory (the private state provider's local store). It is gitignored; do not commit it.
 
+
+**Addendum — four failed `practice_attestation` deploy attempts (written after the entry above):**
+
+Each attempt failed *after* its ~13 minute wallet sync, during contract construction. The wallet side was healthy throughout (synced, NIGHT 5000000000, DUST climbing past 7.9e17); nothing here is a network or funding problem.
+
+1. `first (witnesses) argument to Contract constructor does not contain a function-valued field named practiceSecretKey`.
+   Cause: the script reused `CompiledContract.withVacantWitnesses` from the counter path. That combinator is documented as being for contracts that declare **no** witnesses; `practice_attestation` declares two. Fix: `CompiledContract.withWitnesses(witnesses)`, importing the real implementations from `midnight/contract/src/witnesses.ts`. Deploying executes no circuit, but the generated `Contract` constructor still requires function-valued witness fields.
+2. `withWit.pipe is not a function`.
+   Cause: the value returned by `.pipe()` is not itself pipeable. Fix: pass both combinators to a single `.pipe(...)` call, which is the shape the counter path already used.
+3. `expected instance of ContractMaintenanceAuthority`, thrown from
+   `midnight/contract/node_modules/@midnight-ntwrk/onchain-runtime-v3`.
+   Cause: **the same duplicate-wasm-module class of bug as the ledger-v8 trap, in a second package.** The deploy script lives in `phase0-smoke` but was importing the compiled contract from `midnight/contract/`, so Node resolved that module's `@midnight-ntwrk/compact-runtime` (and therefore `onchain-runtime-v3`) from `midnight/contract/node_modules`. Two copies of the onchain-runtime wasm were live simultaneously, and an object built by one was rejected by the other. Two sibling packages each with their own `node_modules` and no workspace root is sufficient to cause this.
+   Fix applied: copy the compiled build into `midnight/phase0-smoke/build/practice_attestation` so resolution walks up into a single `node_modules`, and point `SB_CONTRACT_DIR` at that copy. Importing `witnesses.ts` across packages stays safe because that file has no external imports.
+   **Better fix for Phase 2:** make `midnight/` an npm workspace so there is one hoisted `node_modules`. The current copy-the-build workaround duplicates artifacts and will rot. Any package combining `midnight-js-*`, `wallet-sdk-*` and a compiled contract is exposed to this.
+4. Stopped early, before proving. No diagnostic value.
+
+**Process fix, more important than any of the above:** added `midnight/phase0-smoke/scripts/check-contract.ts`, a pre-flight that exercises the exact construction path — load compiled module, attach witnesses, attach file assets, read verifier keys — with no wallet and no network, in about a second. It currently reports circuit `attest` and its verifier key loading cleanly. All three diagnosed failures above would have been caught by it instantly instead of costing 13 minutes each. **Run it before every deploy.** The underlying gap is that `midnight/phase0-smoke` has no `tsconfig.json` and no typecheck, so nothing statically checks these scripts; adding one is worth doing early in Phase 2.
 
 ## 2026-07-14 — Play submission prep: production deploy, live privacy policy, Android RevenueCat wiring; 18+ age rating confirmed
 

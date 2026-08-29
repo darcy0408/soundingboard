@@ -196,10 +196,25 @@ async function main() {
   };
 
   const ContractModule: any = await import(join(ZK_CONFIG_PATH, "contract", "index.js"));
-  const compiledContract = CompiledContract.make(CONTRACT_NAME, ContractModule.Contract).pipe(
-    CompiledContract.withVacantWitnesses,
-    CompiledContract.withCompiledFileAssets(ZK_CONFIG_PATH),
-  );
+  // withVacantWitnesses is only for contracts that declare NO witnesses (the
+  // counter). Practice Proof declares practiceSecretKey and sessionCommitments,
+  // and the generated Contract constructor rejects vacant stubs outright:
+  //   "first (witnesses) argument ... does not contain a function-valued field
+  //    named practiceSecretKey"
+  // so the real implementations have to be supplied even to deploy.
+  // Both combinators must go in ONE pipe() — the value returned by pipe() is
+  // not itself pipeable.
+  const witnessCombinator: any =
+    CONTRACT_NAME === "practice_attestation"
+      ? CompiledContract.withWitnesses(
+          ((await import("../../contract/src/witnesses.ts")) as any).witnesses,
+        )
+      : CompiledContract.withVacantWitnesses;
+
+  const compiledContract = CompiledContract.make(
+    CONTRACT_NAME,
+    ContractModule.Contract,
+  ).pipe(witnessCombinator, CompiledContract.withCompiledFileAssets(ZK_CONFIG_PATH));
 
   const zkConfigProvider = new NodeZkConfigProvider<any>(ZK_CONFIG_PATH);
   const providers: any = {
