@@ -1,5 +1,124 @@
 # Session notes
 
+## 2026-08-28 — Midnight hackathon Phases 1, 3 and 4a: attestation circuit, on-device witness export, submission README and demo script
+
+Written by the session that authored the Compact contract and the app-side integration, running in
+parallel with the Phase 0/deploy session whose entry follows below. Read both. Where they disagree
+about Phase 3, this entry is newer: **the Phase 0 entry's "Next" item 4 says Phase 3 is not started,
+which is now stale — Phase 3 is complete and pushed** (commit `5f42197`).
+
+All work is on branch `midnight-hackathon`. Nothing merged to `master`. The `worker/` directory was
+not touched at any point this weekend.
+
+**Done:**
+- **Phase 1 — the Compact circuit.** `midnight/contract/src/practice_attestation.compact`, with
+  witness implementations in `midnight/contract/src/witnesses.ts`, a simulator harness in
+  `midnight/contract/test/simulator.ts`, and 31 tests. One exported circuit, `attest(claimed)`, over
+  a single ledger field `milestones: Map<Bytes<32>, Uint<8>>` — that map is the entire public
+  footprint. Commit `f0a1400`. *Verification: 31/31 tests re-run at session close via
+  `wsl -d Ubuntu -e bash -lc 'source ~/mnenv.sh; cd /mnt/c/dev/soundingboard/midnight/contract && npm test'`
+  — green.*
+- **Phase 3 — on-device witness derivation and export.** `app/src/lib/practiceProof.ts` turns local
+  session history into the circuit's two private inputs; `app/src/app/practice-proof.tsx` is the
+  screen, reachable from Settings → Practice Proof; `app/src/app/_layout.tsx` registers the route.
+  Export goes out through the React Native share sheet as JSON. Commit `5f42197`. *Verification:
+  `tsc --noEmit` on `app/` re-run at session close — clean. `expo lint` was clean at commit time and
+  was NOT re-run at close. **The screen has never been rendered on a device or emulator** — see
+  Risks.*
+- **Phase 4a — submission documentation.** Root `README.md` rewritten to lead with Practice Proof
+  (public/private table, architecture diagram, what the circuit enforces, build steps, honest
+  limitations, and prior-work disclosure); new `midnight/DEMO_SCRIPT.md` with a word-budgeted
+  2-minute shot script and a pre-record checklist. Commit `06f0fe7`. *Verification: prose only, no
+  code paths touched.*
+- **Cross-seam format test.** `midnight/contract/test/witness-file.test.ts` plus
+  `midnight/contract/test/fixtures/sample-witness.json`. The app derives commitments in React Native
+  and the browser dApp feeds them to the circuit, so nothing type-checks across that boundary. The
+  fixture is generated with the exact derivation in `app/src/lib/practiceProof.ts` and run through
+  the real contract, so drift between app and circuit fails a test instead of a demo. It doubles as
+  the standalone demo input if the phone leg is unavailable.
+- **Devpost narrative drafted** in `devpost-story.md` (repo root, **untracked on purpose** — see
+  Decisions): the "Challenges I ran into", "What I learned", and "Accomplishments" sections written
+  from the actual debugging record, plus two factual corrections — "Midnight testnet" changed to
+  "Midnight Preview" (there is no testnet; the network is Preview and the tokens are NIGHT/DUST),
+  and the contract/circuit names filled in.
+
+**Decisions:**
+- **`MAX_SESSIONS = 10`, chosen by measurement rather than estimate**, because the vector width is
+  baked into the witness format, the app export, and the dApp, so it is expensive to change later.
+  Distinctness is a pairwise O(N²) check and Compact loops fully unroll, so cost was measured from
+  the generated `attest.zkir`: 45 comparisons = 430 instructions, 300 = 2,045, 1,225 = 7,743
+  (≈6.3 instructions per comparison over ~145 fixed overhead). 25 would have been affordable; 10 was
+  chosen because the demo is stronger exporting real practice history than padding a mostly-empty
+  25-slot vector.
+- **Rejected the "sort the input and compare neighbours" optimisation.** It looks like it turns
+  O(N²) into O(N), but ordering comparisons on `Bytes<32>` are not native in Compact — they require
+  unpacking to `Vector<32, Uint<8>>` and converting to a 256-bit integer, and OpenZeppelin's
+  `Bytes32` module annotates the pack helper alone at `k=14, rows=10231`. Equality *is* native. The
+  quadratic form of the cheap operation beats the linear form of the expensive one at these sizes.
+- **Added an in-circuit rejection of empty claimed slots (+61 instructions, 430 → 491).** The witness
+  vector is zero-padded, and pairwise distinctness catches a caller claiming *two* padding slots
+  because the zeros collide — but claiming exactly *one* passed silently, overstating the milestone
+  by one. The cheap fix was to trust the app never to do that. The circuit rejects it instead, so
+  "padding is not a session" is a proven property rather than a convention.
+- **Used `expo-crypto` (added at 57.0.2) for the identity secret and commitments, not the existing
+  `app/src/lib/uuid.ts`.** That module documents itself as `Math.random`-based and explicitly not for
+  security tokens — correct for session ids, wrong for the one secret that stops someone else
+  attesting as this user.
+- **Rewrote the root README rather than appending to it.** Its second heading was
+  "Status: **Parked.** Store submission is not being pursued", which described the repo as abandoned
+  to any judge who opened it.
+- **Did not commit `MIDNIGHT_PLAN.md` or `devpost-story.md`.** Both are deliberately untracked
+  working documents, not publishable ones; this repo is public and must stay public for contest
+  eligibility. Leave them untracked unless the user decides otherwise.
+- **Did not run `/midnight-verify:verify` on the contract**, though the plan lists it. It largely
+  duplicates verification already done by hand, and Phase 2's real PLONK proving against the deployed
+  contract is a stronger check of the same properties. Revisit only if Phase 2 slips.
+
+**Next:**
+1. **Deploy `practice_attestation`** — still not on-chain. Follow the pre-flight and deploy commands
+   in the Phase 0 entry below; that session owns this.
+2. **Phase 2: the attest web dApp** in `midnight/attest-app/`. It is unblocked — the witness format
+   is pinned by tests and `midnight/contract/test/fixtures/sample-witness.json` is a real sample file
+   it can load without needing the phone.
+3. **Resolve the one marked placeholder in the root README:** search for `TODO(phase-2)` — it needs
+   the dApp build/run steps and the deployed Preview contract address. This must not ship as-is.
+4. **Fill the last two placeholders in `devpost-story.md`** (search `FILL IN` and `ADJUST`); both need
+   Phase 2 to exist.
+5. **Record the demo video on Saturday** using `midnight/DEMO_SCRIPT.md`. Two-minute hard cap; the
+   checklist at the top of that file matters more than the script, because a cold wallet sync is
+   ~15 minutes and will destroy a take.
+6. Decide whether `devpost-story.md` should be committed before submission.
+
+**Blocked on user:**
+- **Faucet and DUST balance** for Phase 2's attest submissions. The faucet is a browser form with no
+  API, and each submission costs a fee.
+- **Lace wallet is still pointed at mainnet, not Preview** — details in the Phase 0 entry below.
+- **Devpost registration email must match the MLH event-page email.**
+- **Physical device or emulator test of Settings → Practice Proof.** Nothing in the export path has
+  ever executed in the React Native runtime.
+- The pre-submission checks listed at the end of `MIDNIGHT_PLAN.md` (untracked) still need to be
+  worked through before anything is submitted.
+
+**Risks/unverified:**
+- **`app/src/app/practice-proof.tsx` has never been rendered.** It type-checks and lints, but
+  `expo-crypto`'s `getRandomBytes`/`digestStringAsync`, the `Share` API, and the layout are all
+  unverified at runtime. The *derivation* is on firmer ground: the fixture is generated by the app's
+  own formula and passes through the real contract, and that formula was re-derived from
+  `app/src/lib/practiceProof.ts` at commit time and matched byte-for-byte.
+- **The circuit proves distinctness, not authenticity.** Commitments are device-generated, so a
+  determined user could fabricate ten values. This is by design for a weekend build, documented in
+  both `README.md` and `midnight/contract/README.md`, and disclosed in the Devpost draft. The fix is
+  Worker-issued blind-signed receipts. Do not let the demo narration overstate this.
+- **`app/src/lib/device-id.ts` has the same latent bug that was fixed in `practiceProof.ts`:** its
+  `cachedId` survives `AsyncStorage.clear()`, so "Delete all my data" leaves the old id in memory
+  until the app restarts. Pre-existing, deliberately not touched this weekend. Worth fixing later.
+- **The 73 worker tests were not re-run this session.** `worker/` was never touched, but the claim
+  rests on that rather than on a fresh run.
+- **`devpost-story.md` is untracked**, so roughly an hour of drafting in it is not backed up by git.
+- Two sessions have been committing to this working tree in parallel all evening. Always
+  `git fetch` and re-check `git status` before committing, and stage paths individually — never
+  `git add -A`.
+
 ## 2026-08-28 — Midnight hackathon Phase 0: toolchain on Windows/WSL, sample contract deployed to Preview; Phase 1 contract built and tested
 
 All work on branch `midnight-hackathon` (branched from `master`; nothing merged to `master`). Everything under `midnight/` is new this weekend — see `midnight/README.md`.
