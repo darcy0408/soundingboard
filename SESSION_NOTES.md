@@ -1,5 +1,162 @@
 # Session notes
 
+## 2026-08-29 — Practice Proof screen verified on a real Android runtime; on-chain verification path built; device-ID cache fix
+
+Session ran in parallel with another that was converting `midnight/` into an npm workspace. **This
+session deliberately did not touch anything under `midnight/`** (its `node_modules` was being wiped
+and reinstalled), except to READ files. All writes were confined to `app/` and to locations outside
+the repository.
+
+**Done:**
+- **The Practice Proof screen has now actually executed in the React Native runtime.** Previous
+  entries flagged `app/src/app/practice-proof.tsx` as never having been rendered anywhere; that is
+  no longer true. Run on an Android 16 emulator (AVD `m1demo`) against a freshly built debug APK.
+  *Verification level: rendered, interacted with, and screenshotted.* Specifically confirmed:
+  - **Layout renders correctly** — headline, count card, both explainer sections, export button and
+    the "keep the export private" card.
+  - **`claimableCount()` is correct on device.** Seeded seven sessions into the app's real storage:
+    five completed rehearse sessions, one rehearse session with `completedAt: null`, and one
+    completed vent session. The screen shows **"5 of 10 sessions ready to prove"**, so the filter in
+    `app/src/lib/practiceProof.ts` excludes both non-qualifying sessions in the real runtime, not
+    just in vitest.
+  - **`expo-crypto`'s `getRandomBytes` works.** It produced a 32-byte secret key which was persisted
+    to AsyncStorage under `sb.practiceProof.keys` and appeared identically in the exported JSON.
+  - **React Native's `Share` API works.** Tapping "Export proof input" opened the Android system
+    share sheet with the witness JSON as its payload.
+  - **`expo-crypto`'s `digestStringAsync` produces the RIGHT bytes, not merely some bytes.** This
+    was the one real cross-seam risk that `midnight/contract/test/witness-file.test.ts` could not
+    catch: that fixture pins the derivation formula, but if Android's SHA-256 or its string encoding
+    differed from the host implementation that generated the fixture, every test would still pass
+    and the demo would still fail. Captured the actual witness the device exported and compared it
+    against a host-computed derivation using the device's own salt: **all five commitments match
+    byte-for-byte**, the five padding slots are all-zero, and `claimed` is 5.
+- **The real device export was run through the real compiled circuit.** Took the exported witness
+  JSON from the emulator and executed `attest` against the compiled `practice_attestation` contract.
+  It attests to exactly 5, and an over-claim of 6 is rejected by the circuit. *Verification level:
+  executed locally against the compiled contract; no proof server and no network involved.* This
+  closes the app-to-dApp seam end-to-end with real data rather than a fixture.
+- **Built and tested a judge-followable on-chain verification path** — the demo's third beat
+  ("verify it on-chain"). Three scripts, located as described under "Where the verification package
+  lives" below:
+  - `verify-onchain.mjs` — queries the Midnight Preview indexer for the deployed contract's public
+    ledger state and decodes it with the contract's own generated `ledger()` reader. Nothing in it
+    trusts the app, the dApp or the deploy script; its only inputs are a public contract address and
+    a public indexer URL. *Verification level: run live against contract
+    `7f4f10067bf78048f362f96081095c0ea47848e885131504c13690c153a8dba5`, block 626075.* It currently
+    prints an **empty** milestones map, which is correct — no `attest` call has been submitted yet.
+  - `selftest.mjs` — proves the populated-ledger rendering path, which the live run cannot yet
+    exercise. Runs three attestations through the real circuit locally and renders the result
+    through the identical rendering function. *Verification level: PASS.* It also demonstrates two
+    properties worth showing on camera: two separate identities stay unlinkable, and a user raising
+    their milestone from 5 to 7 **replaces** their row rather than adding a second one.
+  - `device-attest.mjs` — the device-export check described above. *Verification level: PASS.*
+- **Fixed the `app/src/lib/device-id.ts` cache bug** flagged as a known latent issue in the previous
+  entry. `getDeviceId()` memoised the ID in module scope, so `AsyncStorage.clear()` removed the
+  stored value while the old ID kept being sent to the Worker until the app restarted. Added
+  `clearDeviceId()` mirroring the existing `clearPracticeKeys()`, and wired it into the delete flow
+  in `app/src/app/settings.tsx`. Commit `85099a9`. *Verification level: `npx tsc --noEmit` and
+  `npx expo lint` both clean in `app/`, AND the delete flow was exercised on the emulator — it runs
+  without any JavaScript error, empties history, resets onboarding and entitlement, and removes the
+  practice-proof keys.*
+- **Backed up `devpost-story.md` outside the repository.** The previous entry noted that roughly an
+  hour of drafting had no git backup because the file is deliberately untracked. Copy now at
+  `C:\dev\ideas\soundingboard-devpost-story-2026-08-29-backup.md`, byte-identical at 14,022 bytes.
+  This is a point-in-time copy, not a sync — it will go stale as the file is edited.
+
+**Where the verification package lives (IMPORTANT — it is not in git):**
+`C:\dev\ideas\soundingboard-onchain-verify\`, outside the repository. It was written there rather
+than into `midnight/` only because `midnight/` was being restructured by a parallel session at the
+time. **Its natural home is inside `midnight/`, and moving it there is a next step.** It is a
+self-contained npm package: run `npm install`, then `npm run verify` (live chain), `npm run selftest`
+(populated ledger), or `npm run device` (real device export). It has exactly one dependency,
+`@midnight-ntwrk/compact-runtime` 0.16.0. All three commands were re-run from that location after
+copying and all three pass. The folder also holds three emulator screenshots under `screenshots/`
+and the seed-data generator used for the runtime test.
+
+**Decisions:**
+- **Rebuilt the Android APK from scratch rather than reusing the July one.** `expo-crypto` was added
+  to the app this weekend and is a native module, so the existing debug APK (2026-07-12) could not
+  have contained it. The build took 7m22s.
+- **Used JDK 21, not the JDK 26 that `JAVA_HOME` points at on this machine.** Gradle 9.3.1 does not
+  accept JDK 26. `C:\Program Files\Eclipse Adoptium\jdk-21.0.10.7-hotspot` is installed and works.
+  Anyone rebuilding must override `JAVA_HOME` for the Gradle invocation or it fails immediately.
+- **Navigated by deep link (`soundingboard://practice-proof`, `soundingboard://settings`) instead of
+  tapping the Settings gear.** In a dev-client build the expo-development-client menu intercepts
+  taps in the top-right region where the gear sits, and opens over the app instead. The Settings to
+  Practice Proof link itself was confirmed present and correctly placed by screenshot; only the
+  automated tap was unreliable, not the link.
+- **Cold-booted the emulator (`-no-snapshot-load`).** The 2026-07-13 session was blocked by a
+  recurring "System UI isn't responding" dialog that made the app untestable. It did not recur once
+  this session, which supports the earlier guess that it was a stale-snapshot or resource artefact
+  rather than an app fault.
+- **Seeded the app's storage directly rather than running real practice sessions.** Writing a known
+  mixed dataset into the AsyncStorage SQLite database (`RKStorage`, table `catalystLocalStorage`)
+  gives a deterministic, reproducible test whose expected answer is known in advance, costs no
+  Anthropic API calls, and allows the excluded-session cases to be tested deliberately. Real
+  sessions would have exercised the same code path with a less informative dataset.
+- **Deserialise on-chain state with `ContractState` from `@midnight-ntwrk/compact-runtime`, NOT from
+  `@midnight-ntwrk/ledger-v8`.** This is the same duplicate-wasm-module trap already documented in
+  this file for `ledger-v8` and for `onchain-runtime-v3` — now hit in a third place. Both packages
+  export a class named `ChargedState` backed by their own wasm instance, and wasm-bindgen
+  identity-checks classes per instance, so a `ChargedState` produced by `ledger-v8` is rejected by
+  the runtime that `ledger()` executes on, with the error `expected instance of ChargedState`.
+  Deserialising with the same module that reads the state avoids it, and lets the package drop the
+  `ledger-v8` dependency entirely.
+- **Temporarily added a `console.log` to `practice-proof.tsx` to capture the exported witness, then
+  reverted it.** The Android clipboard cannot be read over adb and the share sheet truncates its
+  preview, so there was no other way to obtain the exact bytes the device produced. The line was
+  removed immediately after capture; the committed file does not contain it, and `tsc` and
+  `expo lint` were re-run clean afterwards.
+- **Did not run the `midnight/contract` test suite this session**, because `midnight/` was mid
+  workspace-conversion with `node_modules` being reinstalled. The parallel session owns that
+  verification.
+
+**Next:**
+1. **Move the verification package from `C:\dev\ideas\soundingboard-onchain-verify\` into
+   `midnight/`** now that the workspace conversion has landed (commit `a898423`). It is currently
+   outside git and therefore unbacked-up. Note that it carries a copy of the generated contract
+   module at `contract/index.js`; inside the workspace it should import the real build output
+   instead of keeping a copy, which will otherwise rot.
+2. **Re-run `verify-onchain.mjs` immediately after the first `attest` submission lands.** Right now
+   it prints an empty map, which is honest but undemonstrative. One real row turns it into the
+   demo's third beat and gives the README a concrete verification transcript.
+3. **Resolve `TODO(phase-2)` in the root `README.md`** (line 113 as of this entry) — it needs the
+   attest dApp build and run steps. The deployed contract address is already recorded in
+   `midnight/README.md`. This placeholder must not ship.
+4. **Fill the two remaining placeholders in `devpost-story.md`** (search for `FILL IN` and `ADJUST`).
+5. **Record the demo video** using `midnight/DEMO_SCRIPT.md`. Two-minute hard cap.
+6. Decide whether `devpost-story.md` should be committed before submission.
+
+**Blocked on user:**
+- **Lace wallet is still pointed at mainnet rather than Preview** — unchanged from previous entries.
+- **Faucet funding and DUST balance** — the faucet is a browser form with no programmatic API, and
+  each attest submission costs a fee.
+- **Devpost registration email must match the MLH event-page email.**
+- **iOS device test.** Everything verified this session was verified on Android only. There is still
+  no iOS device or simulator available on this Windows machine.
+- The pre-submission checks recorded at the end of `MIDNIGHT_PLAN.md` (untracked) still apply.
+
+**Risks/unverified:**
+- **The Practice Proof screen has still never run on iOS.** `expo-crypto`'s `getRandomBytes` and
+  `digestStringAsync`, and the `Share` API, are now proven on Android 16 only. All three are
+  cross-platform Expo APIs so the risk is low, but it is not zero and it has not been tested.
+- **The populated-ledger rendering has only been proven against a locally simulated ledger**, never
+  against a real on-chain row, because no `attest` transaction exists yet. The decode half was
+  proven against the real chain and the render half against the real circuit, but the two have not
+  been exercised together on real on-chain data.
+- **Proving time for `attest` is still unmeasured** — unchanged from the previous entry, and still
+  the thing most likely to hurt a live demo. Local circuit execution in these scripts does not
+  generate a ZK proof, so nothing done this session measures it.
+- **The verification package and the emulator screenshots live outside git** in `C:\dev\ideas\`.
+  Nothing backs that folder up.
+- **The screenshots show seeded demo data, not real practice history** — the persona names in them
+  ("Mum", "Dan", "Priya", "Sam", "Alex") are invented test fixtures. Fine as a UI reference, but
+  check before using any of them in the submission as though they were genuine usage.
+- **The 73 worker tests were not re-run this session.** `worker/` was not touched, but as with the
+  previous entry that claim rests on the absence of changes rather than on a fresh run.
+- Two sessions were committing to this working tree in parallel again. Always `git fetch` and
+  re-check `git status` before committing, and stage paths individually — never `git add -A`.
+
 ## 2026-08-28 — Midnight hackathon Phases 1, 3 and 4a: attestation circuit, on-device witness export, submission README and demo script
 
 Written by the session that authored the Compact contract and the app-side integration, running in
