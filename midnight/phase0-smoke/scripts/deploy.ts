@@ -17,7 +17,8 @@ import WebSocket from "ws";
 import { Buffer } from "node:buffer";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { randomBytes } from "node:crypto";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { HDWallet, Roles } from "@midnight-ntwrk/wallet-sdk-hd";
@@ -45,9 +46,17 @@ import { setNetworkId } from "@midnight-ntwrk/midnight-js-network-id";
 import * as Rx from "rxjs";
 
 const NETWORK = "preview" as const;
-const CONTRACT_NAME = "counter";
 const HERE = fileURLToPath(new URL(".", import.meta.url));
-const ZK_CONFIG_PATH = join(HERE, "..", "build", "counter");
+
+// Defaults deploy the Phase 0 counter smoke test. Override to deploy any other
+// compiled contract, e.g. the Practice Proof circuit:
+//   SB_CONTRACT_NAME=practice_attestation \
+//   SB_CONTRACT_DIR=../contract/build/practice_attestation \
+//   npx tsx scripts/deploy.ts
+const CONTRACT_NAME = process.env.SB_CONTRACT_NAME ?? "counter";
+const ZK_CONFIG_PATH = process.env.SB_CONTRACT_DIR
+  ? resolve(HERE, "..", process.env.SB_CONTRACT_DIR)
+  : join(HERE, "..", "build", "counter");
 
 const SEED_PATH =
   process.env.SB_WALLET_SEED_PATH ??
@@ -206,11 +215,23 @@ async function main() {
     midnightProvider: walletProvider,
   };
 
-  log("deploying counter (proof generation takes 30-60s)...");
+  // The counter holds no private state. Practice Proof stores a device-local
+  // secret plus a fixed-width commitment vector (MAX_SESSIONS = 10). Deploying
+  // does not execute any circuit, so the commitments start zero-filled; real
+  // ones are supplied when attest() is called.
+  const initialPrivateState =
+    CONTRACT_NAME === "practice_attestation"
+      ? {
+          secretKey: new Uint8Array(randomBytes(32)),
+          commitments: Array.from({ length: 10 }, () => new Uint8Array(32)),
+        }
+      : {};
+
+  log(`deploying ${CONTRACT_NAME} (proof generation takes 30-60s)...`);
   const deployed: any = await deployContract(providers, {
     compiledContract,
     privateStateId: `${CONTRACT_NAME}PrivateState`,
-    initialPrivateState: {},
+    initialPrivateState,
   });
 
   const pub = deployed.deployTxData.public;
