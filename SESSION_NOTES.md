@@ -1,5 +1,134 @@
 # Session notes
 
+## 2026-08-29 (later) — Submission audit: on-chain attestation independently verified, eligibility and compliance swept, README overstatement corrected
+
+Second work block on 2026-08-29, after the entry below. **It corrects three claims in that
+earlier entry, which are now stale — see "Corrections" at the end of this entry.** Phase 2 was
+completed by a parallel session during this block (commits `db73ed6` through `db8a8f7`); that
+session owns its own handoff and this entry does not attempt to describe its internals.
+
+**Done:**
+- **Independently verified that the attestation is genuinely on-chain.** Queried the public
+  Midnight Preview indexer directly and decoded the returned ledger state with the contract's own
+  generated `ledger()` reader, rather than trusting the submitting script's own report. Result:
+  the contract's latest action at address
+  `7f4f10067bf78048f362f96081095c0ea47848e885131504c13690c153a8dba5` is a **`ContractCall`** (no
+  longer just the deploy) at **block 632945**, transaction hash
+  `3f7d357355b8dbf01f5e52c032074bb82491032d355d14365c7ab711759108ad`, and the public `milestones`
+  map contains exactly **one row: one opaque 32-byte identity mapped to the number 3**. Nothing
+  else is on chain. *Verification level: live network query, decoded locally.*
+- **Ran both test suites that the root `README.md` cites to judges, to confirm the numbers are
+  true.** `worker/`: **73 passed**, matching the README exactly. `midnight/contract` (via
+  `npm test -w sb-practice-attestation` from WSL): **52 passed**, also matching. *Verification
+  level: both executed fresh this block.* An automated audit had flagged the worker figure as
+  possibly wrong because a static grep counted 57 call sites; that grep was undercounting, because
+  two `it.each` blocks expand to 15 and 8 cases at runtime. The README figure is correct.
+- **Corrected an overstatement in the root `README.md` and pushed it** (commit `709dba0`). The
+  attest section previously read "Submitting from the browser needs the Lace extension pointed at
+  Preview", which a judge reading only the README would reasonably take to mean that browser
+  submission works and merely requires a wallet. It does not: wallet detection and connection are
+  wired, but the proof-and-submit path through the Lace extension has never been run end to end,
+  because Lace was still pointed at mainnet while it was written. The dApp's own UI and
+  `midnight/DEMO_SCRIPT.md` already stated this honestly; the README did not. Replaced with an
+  explicit statement of what is and is not exercised.
+- **Ran a contest-eligibility audit of the submission.** *Verification level: automated audit whose
+  key findings were checked against git and the live network.* Results:
+  - **Prior-work disclosure: PASS.** `README.md` contains a "What existed before the hackathon"
+    section naming commit `dd2ca6a` (2026-07-27) as the cutoff. Independently confirmed:
+    `git merge-base master midnight-hackathon` is exactly `dd2ca6a`, and
+    `git diff dd2ca6a..HEAD -- worker/ prompts/` is empty, so the claim that those trees are
+    untouched is literally true. This was the highest-risk eligibility item.
+  - **Repo public: PASS** (`gh repo view` reports `PUBLIC`).
+  - **No secrets committed: PASS.** No seed, mnemonic, or `.env` content tracked.
+  - **The private matter recorded in `MIDNIGHT_PLAN.md` has not leaked into the repo: PASS.** Both
+    `MIDNIGHT_PLAN.md` and `devpost-story.md` have zero commit history — they have never been
+    committed, only ever existed as untracked working-tree files.
+  - **Devpost registration email matching the MLH event page: NOT VERIFIABLE** from the repository.
+    Still on the user.
+- **Ran a positioning-compliance audit** across every judge-visible and user-visible surface: the
+  root `README.md`, `midnight/README.md`, `midnight/DEMO_SCRIPT.md`, `devpost-story.md`, all app
+  screens under `app/src/`, and the `store/` metadata files. *Verification level: automated sweep,
+  reported findings reviewed.* **Result: no violations.** The SPEC.md section 5.2 disclaimer is
+  reproduced verbatim in `app/src/lib/copy.ts` and rendered unmodified in both required places
+  (onboarding consent and settings). Every apparent banned-word hit was either the disclaimer
+  itself, a negation ("it is not therapy"), a reference to a real human therapist as an external
+  stakeholder, or "companion" in its ordinary software sense ("the companion web dApp"). No
+  medical claims anywhere.
+- **Prepared the phone leg of the demo video.** `midnight/DEMO_SCRIPT.md` narrates the number
+  **eight** three times, so the emulator's seeded practice history was regenerated to contain
+  exactly eight completed rehearse sessions (plus one unfinished rehearse session and one vent
+  session, which must be excluded and are). Confirmed on screen: **"8 of 10 sessions ready to
+  prove."** *Verification level: rendered and screenshotted on the emulator.*
+- **Refreshed the out-of-repo backup of `devpost-story.md`** at
+  `C:\dev\ideas\soundingboard-devpost-story-2026-08-29-backup.md`. The earlier backup had gone
+  stale once the parallel session filled in the `FILL IN` and `ADJUST` placeholders; the file is
+  now 15,204 bytes. This is a point-in-time copy, not a sync.
+
+**Decisions:**
+- **Did not edit `midnight/` at all in this block**, other than reading files and running its test
+  suite. The parallel session owned that tree throughout, and the standing instruction for this
+  session was to stay out of it.
+- **Added a new session-notes entry rather than editing the earlier 2026-08-29 entry.** Editing
+  history would hide that those claims were true when written and were later superseded; the
+  corrections are listed explicitly below instead.
+- **Left the on-chain verification package outside the repository for now** (see the earlier entry
+  for its location and contents). Moving it into `midnight/` is still the right destination, but
+  doing so during an active parallel session working in that tree was a poor trade hours before a
+  deadline.
+
+**Next:**
+1. **Decide the demo's number before filming, because three things must agree:** the count shown in
+   the app, the commitments in the exported witness, and the number on chain. The script narrates
+   eight; the chain currently reads 3. The recommended route is to submit a fresh attestation at 8
+   during recording — the circuit requires the milestone only to increase, so 8 over 3 is valid, and
+   the row appearing live is the stronger shot. Note this will create a **second** row under a new
+   identity, because the phone's Practice Proof keys were regenerated when the delete-all-data flow
+   was tested; two unlinkable identities actually demonstrates the privacy property rather than
+   undermining it.
+2. **Record the demo video.** Two-minute hard cap. The pre-record checklist at the top of
+   `midnight/DEMO_SCRIPT.md` matters more than the script itself.
+3. **Move the verification package into `midnight/`** now that the parallel session's Phase 2 work
+   has landed.
+4. Submit on Devpost, and confirm the registration email matches the MLH event page.
+
+**Blocked on user:**
+- **Recording the video** — nothing else can substitute for this.
+- **Devpost registration email matching the MLH event-page email.**
+- **Keeping the repository public after judging**, which the contest rules require indefinitely.
+- The pre-submission checks recorded at the end of `MIDNIGHT_PLAN.md` (untracked) still apply.
+- Lace wallet remains pointed at mainnet rather than Preview. This is no longer blocking, because
+  the headless submission path is the one that works and is the one the demo script uses, but it
+  does mean the browser-wallet path stays untested.
+
+**Corrections to the earlier 2026-08-29 entry below (it was accurate when written):**
+- It states "**Proving time for `attest` is still unmeasured**". This is now stale: proving has been
+  measured at **2.7 seconds** (recorded in `midnight/README.md`, around block 632945). That is short
+  enough to film live.
+- It states the **populated-ledger rendering "has only been proven against a locally simulated
+  ledger, never against a real on-chain row"**. Also now stale: the same rendering path has been run
+  against the real chain and correctly displays the real row (identity to milestone 3).
+- It states "**The 73 worker tests were not re-run this session**". They have now been re-run:
+  **73 passed**.
+- Still accurate and still worth acting on: the verification package and the emulator screenshots
+  remain outside git in `C:\dev\ideas\`, with nothing backing that folder up; and the Practice Proof
+  screen has still never been run on iOS.
+
+**Risks/unverified:**
+- **The browser/Lace submission path has never been executed end to end.** The README now says so
+  plainly, but it remains the one place where the dApp is less capable than a casual reader might
+  assume. Do not demonstrate the Connect-wallet button on camera.
+- **Only one attestation exists on chain, at milestone 3, under an identity that does not
+  correspond to the current phone.** Any filming that shows the phone exporting and then shows the
+  chain must account for this — see item 1 under Next.
+- **The emulator's practice history is seeded demo data, not genuine usage.** The persona names in
+  it are invented fixtures. This is fine for a UI demonstration but should not be described on
+  camera as real personal history.
+- The eligibility and compliance sweeps were performed by automated audits. Their highest-risk
+  findings were re-checked by hand against git and the live network, but the exhaustiveness of the
+  sweeps themselves rests on those agents having read what they claimed to read.
+- Two sessions were committing to this working tree in parallel throughout. Always `git fetch` and
+  re-check `git status` before committing, and stage paths individually — never `git add -A`.
+
 ## 2026-08-29 — Practice Proof screen verified on a real Android runtime; on-chain verification path built; device-ID cache fix
 
 Session ran in parallel with another that was converting `midnight/` into an npm workspace. **This
