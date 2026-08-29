@@ -1,5 +1,48 @@
 # Session notes
 
+## 2026-08-28 — Midnight hackathon Phase 0: toolchain on Windows/WSL, sample contract deployed to Preview; Phase 1 contract built and tested
+
+All work on branch `midnight-hackathon` (branched from `master`; nothing merged to `master`). Everything under `midnight/` is new this weekend — see `midnight/README.md`.
+
+**Done:**
+- **Phase 0 checkpoint met and verified on-chain.** The `compact-examples` counter compiles, proves, and deploys to Midnight **Preview** from this Windows machine. Contract address `e0e3fee37d7369c33f60824cd69a5316277c2b08f9177a016f8b9c93ee42bb78`, block 621821. Verified *independently of the deploy script* by querying the indexer directly (`contractAction` returned `__typename: "ContractDeploy"` at that address and block) — see the curl command recorded in `midnight/README.md`.
+- **Toolchain installed in WSL2 Ubuntu 24.04**, not Windows: Compact CLI 0.5.2, Compact compiler **0.31.1**, Node 22.23.2 via nvm. A helper `~/mnenv.sh` (copy committed at `midnight/mnenv.sh`) fixes PATH so `node`/`npm` resolve to the WSL builds rather than Windows interop. Ubuntu's `~/.bashrc` returns early for non-interactive shells, so `bash -lc` alone does not load nvm.
+- **Proof server 8.1.0** running in Docker on port 6300, health/ready/version all confirmed responding.
+- **Wallet funded on Preview.** Headless test wallet at `mn_addr_preview1jrqpe9kx76vvgedz69qznxan82248t5nwrwqczyccnx0mjyms3vstl03e7`, funded 5000 tNIGHT from the faucet, NIGHT registered for DUST generation (registration fee: 1). Seed lives **outside the repo** at `~/.midnight-soundingboard/preview-wallet.json` in the WSL home, mode 0600 — this repo is public and the seed must never enter it.
+- **Phase 1 contract verified** (written by a parallel session, commit `f0a1400`): `midnight/contract/src/practice_attestation.compact` plus witnesses and tests. **31/31 tests pass** across `test/practice_attestation.test.ts` (22) and `test/witness-file.test.ts` (9); `npx tsc --noEmit` exits 0.
+- **Rebuilt the Phase 1 contract with full ZK.** The committed build was produced with `--skip-zk` and had no `keys/` directory, so it could not have been deployed. `npm run build` in `midnight/contract` now produces `keys/attest.prover` (2.8 MB) and `keys/attest.verifier`. For scale, the counter's prover key is 14 KB.
+- **Generalised the deploy script** (`midnight/phase0-smoke/scripts/deploy.ts`, commit `09b062a`) so one verified path deploys both contracts, via `SB_CONTRACT_NAME` and `SB_CONTRACT_DIR`.
+
+**Decisions:**
+- **Pinned the compiler to 0.31.1, NOT the 0.34.0 that `compact update` installs by default.** 0.34.0 targets ledger 9; Preview, Preprod and Mainnet all still run ledger 8. Midnight's own 0.34.0 release notes say to stay on 0.31.x for deployed networks. A contract built on 0.34.0 compiles cleanly and then fails on-chain, so this would have surfaced late and expensively. Whole stack now follows the docs' Preview compatibility matrix: compiler 0.31.1, compact-runtime 0.16.0, ledger-v8, midnight-js 4.1.1, proof server 8.1.0.
+- **Forced a single copy of `@midnight-ntwrk/ledger-v8` via an npm `overrides` block.** `midnight-js-protocol` pins it to exactly 8.1.0 while every `wallet-sdk-*` package asks for `^8.1.0` (resolving to 8.1.1), so npm installs two copies of the wasm module. wasm-bindgen identity-checks classes per module instance, so objects built by one copy are rejected by the other with `expected instance of LedgerParameters` — an error naming a type, not a version. **Any package mixing `midnight-js-*` with `wallet-sdk-*` needs this**, including the Phase 2 dApp.
+- **Lace must use the LOCAL proof server, never the remote one.** The proof server receives the witness (the private inputs) in order to build the proof, so remote proving would send session commitments to a third party — exactly what this project claims does not happen. This is a correctness requirement for the privacy story, not a preference.
+- **Deferred the Lace wallet setup rather than burning more of the user's evening on it** (see Blocked/Risks).
+- Kept the Phase 0 smoke test in the repo as a working reference deploy rather than deleting it, since it is the only end-to-end-verified path we have.
+
+**Next:**
+1. **Check the result of the in-flight `practice_attestation` deploy** — it was still running when this session closed (see Risks). If it failed, the log is `/tmp/pa-deploy.log` inside WSL. Re-run with:
+   `cd midnight/phase0-smoke && SB_CONTRACT_NAME=practice_attestation SB_CONTRACT_DIR=../contract/build/practice_attestation npx tsx scripts/deploy.ts`
+   (Requires Docker running for the proof server, and ~15 minutes of wallet sync.)
+2. **Phase 2: scaffold the attest web dApp** in `midnight/attest-app/` using the `midnight-dapp-dev` plugin. Start its `package.json` with the `ledger-v8` overrides block above. Use `FetchZkConfigProvider` (browser fetches ZK config over HTTP) rather than the `NodeZkConfigProvider` the headless scripts use, which means the compiled `keys/` and `zkir/` output must be served as static assets.
+3. Build the dApp against the headless wallet path first so the demo never hard-depends on Lace, then try the DApp Connector's own `connect("preview")` against the main Lace extension — it may select the network itself regardless of Lace's settings panel.
+4. Phase 3 app integration (`app/src/lib/practiceProof.ts` and the proof screen) — not started.
+
+**Blocked on user:**
+- **Lace wallet is on mainnet, not Preview.** Confirmed by its Receive address (`mn_shield-addr1re5...` — the missing `_preview` is the tell). Its Midnight settings panel configures the network by raw node/indexer URLs, which currently read `blockfrost.lw.iog.io/midnight-mainnet...`. They need to become `https://rpc.preview.midnight.network` and `https://indexer.preview.midnight.network/api/v4/graphql`, but the user could not click into those fields. Unresolved. Note the proof server there is already correctly set to Local.
+- The faucet is a browser form with **no programmatic API**, so every funding step needs the user. The rate limit is **per-address** (24h), so a fresh address can be funded immediately.
+- Devpost registration must use the same email as the MLH event-page registration.
+- Demo video (2 minute hard cap) must be recorded Saturday.
+
+**Risks/unverified:**
+- **The `practice_attestation` deploy was still in flight at session close and its result is UNKNOWN.** Do not assume the contract is live. The counter deploy is the only on-chain deploy actually confirmed.
+- **Proving time for `attest` has never been measured.** Its prover key is 2.8 MB against the counter's 14 KB, reflecting the circuit's 45 pairwise commitment comparisons. The counter proved in well under a minute; `attest` will be slower by an unknown factor. This matters for a live demo — measure it before relying on it on camera.
+- **Lace Beta (`hgeekaiplokcnmakghbdfbgnlfheichg`) is deprecated and its sync is broken** — it reached 50%, then reset to 0% and stayed there, and could not build a transaction. Preview itself was healthy at the time (indexer and node both advancing), so the fault is the extension. Midnight support has moved to the main Lace extension, whose store listing still describes only Cardano and never mentions Midnight. The official Midnight docs still point at the deprecated Beta. Expect to fight this.
+- **Every headless script run pays a ~13 minute wallet sync.** `InMemoryTransactionHistoryStorage` does not persist sync state, and there is no restore-from-serialized entry point in this SDK version: the sub-wallets expose `serializeState()` but only `startWithSeed`/`startWithSecretKeys`/`startWithSecretKey`/`startWithPublicKey` as builders. The only headless mitigation is a long-lived process. This does not affect the browser dApp, which uses the extension's own sync.
+- Wallet SDK patterns came from a plugin skill last verified 2026-06-02; the published package versions still match its lockfile exactly, so no drift was observed, but the indexer API version differs between sources (docs say v4, the skill's examples say v3 — both are live and both work).
+- The Phase 0 smoke test writes a `midnight-level-db/` directory (the private state provider's local store). It is gitignored; do not commit it.
+
+
 ## 2026-07-14 — Play submission prep: production deploy, live privacy policy, Android RevenueCat wiring; 18+ age rating confirmed
 
 **Done:**
