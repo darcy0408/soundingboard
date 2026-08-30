@@ -1,5 +1,107 @@
 # Session notes
 
+## 2026-08-30 — Video recorded and stitched, Devpost submitted; Preview submission outage documented
+
+Session ran from midday 2026-08-29 to 08:30 on 2026-08-30, overlapping a parallel session that was
+editing `midnight/DEMO_SCRIPT.md` and re-seeding the emulator at the same time. **The hackathon entry
+is submitted.** Devpost accepted it before the 08:00 America/Denver initial deadline, with the final
+edit window open until 09:45.
+
+**Done:**
+- **Built `midnight/phase0-smoke/scripts/preflight.ts`** (`npm run preflight -w sb-phase0-smoke`,
+  commit `fed317c`). One command runs the whole record-day checklist without submitting anything:
+  checks the proof server on `:6300`, confirms the compiled contract exists, syncs the wallet and
+  refreshes the on-disk snapshot, prints the DUST balance, reads the contract's `milestones` map back
+  through the indexer, and prints the range of claims the circuit will currently accept. Exits 0 with
+  `READY` or 1 with a list of problems. *Verification level: run repeatedly across the session; last
+  clean run printed `READY`, wallet synced in 1.2 s from snapshot, DUST 4.72, milestone
+  `257f5d2595…cabf5327 -> 3`.*
+- **Fixed actively wrong advice in `midnight/DEMO_SCRIPT.md`** (same commit). The checklist told the
+  reader to warm the wallet snapshot by running `npm run attest`. That is harmful: `attest` requires a
+  claim strictly greater than the recorded milestone, so a warm-up submission either fails or consumes
+  the headroom the demo needs to show the number increase. Replaced with the `preflight` command,
+  which deliberately does not submit.
+- **Diagnosed and fixed a dead Cloudflare Worker.** Every `/v1/turn` call was returning
+  `502 upstream_error` — reproduced with plain `curl`, no app involved, so it was never a device
+  problem. The Worker's catch block deliberately swallows the provider error, so the cause was
+  invisible. Ran the Worker against Cloudflare's edge with `wrangler dev --remote` (no production
+  deploy) with a temporary log line, which showed `401 authentication_error — "API key is invalid."`
+  The `ANTHROPIC_API_KEY` secret had been revoked or rotated. The user set a fresh secret with
+  `wrangler secret put`. *Verification level: confirmed live afterwards — `/v1/turn` returned a real
+  in-character reply in 1.5 s and `/v1/feedback` returned valid scored JSON in 5.2 s.* The temporary
+  diagnostic was reverted; `git status worker/` is clean and nothing was deployed.
+- **Recorded and assembled the two-minute demo video.** Final file is
+  `C:\Users\Darcy\Videos\SoundingBoard-PracticeProof-Demo-LOUD.mp4`, 1:58, 1920x1080, audio
+  loudness-normalised to about -16 LUFS (the raw stitch was noticeably quiet). Assembled with ffmpeg
+  from three separately recorded clips — the spoken hackathon-name intro, the app walkthrough, and the
+  proof/terminal segment — each normalised to a common format before concatenation. Uploaded to
+  YouTube at `https://youtu.be/Zl7quXdB-WQ`.
+- **Confirmed the Devpost submission is in**, with the story, repo link, prior-work disclosure and
+  video attached. Track: Integrate Midnight only.
+- **Generated a spare witness file** at
+  `midnight/contract/test/fixtures/backup-witness.local.json` — a fresh random secret and salt with
+  seven real commitments, derived with the exact scheme in `app/src/lib/practiceProof.ts`
+  (`sha256("soundingboard:practiceproof:v1" : salt : sessionId : completedAt)`). It exists so a
+  retake can produce a *second* on-chain identity instead of needing a higher claim on the existing
+  one. *Verification level: parsed and accepted by the real `parseWitnessFile` / `assertClaimable`
+  from `midnight/contract/src/witness-file.ts`; never submitted.* Correctly excluded from git by the
+  `*.local.json` rule added in commit `4036966`.
+
+**Decisions:**
+- **Recorded as three separate clips joined afterwards, not one continuous take.** Earlier plans
+  assumed a physical phone and a desktop needing two legs cut together. The "phone" is an emulator
+  window on the same desktop, so a single screen recording could cover everything — but by the time
+  that was clear, a good app-walkthrough take already existed. Joining three clips preserved it.
+- **Claimed the demo number would be 7 and left the chain at 3.** The circuit only accepts a claim
+  strictly greater than the recorded milestone, so any value 4–10 works. Seven matches the sample
+  witness fixture and the emulator's seeded session count.
+- **Did not implement or demo browser-wallet submission.** Unchanged from previous sessions and
+  disclosed in the Devpost write-up.
+- **Did not modify `worker/` or `prompts/`.** The Worker diagnostic ran against a temporary preview
+  instance and was reverted; production was never redeployed.
+
+**Next:**
+1. If the Preview network recovers, run
+   `cd /mnt/c/dev/soundingboard/midnight && SB_CLAIMED=7 npm run attest -w sb-phase0-smoke`.
+   Success moves the public record from 3 to 7 and would let the Devpost text about the outage be
+   softened. Purely optional — nothing in the submission depends on it.
+2. After the event, consider the countersigning work already described in the README's honest-limitations
+   section: the Worker blind-signs a receipt per completed feedback call and the circuit verifies the
+   signature instead of merely checking distinctness. That closes the "commitments are generated
+   on-device and could be fabricated" gap without the server learning anything.
+3. `midnight/DEMO_SCRIPT.md` still describes the older two-leg recording plan in places. If the video
+   is ever re-cut, reconcile it with the single-screen approach that was actually used.
+
+**Blocked on user:**
+- Nothing outstanding for the submission — it is in, and the edit window closes 09:45 America/Denver
+  on 2026-08-30.
+
+**Risks/unverified:**
+- **Midnight Preview stopped accepting transactions for roughly nine hours**, from about 23:20 on
+  2026-08-29 through at least 07:58 on 2026-08-30. The failure is specific and reproducible: proofs
+  generate locally in about 2 s, the indexer answers reads, chain height advances normally
+  (verified climbing 641784 → 646163), `system_health` reports 14 peers and `isSyncing: false`, and a
+  raw websocket to `wss://rpc.preview.midnight.network` opens in 490 ms and stays up — but a submitted
+  transaction never finalises. The run hangs after `[attest] proof generated`. Four attempts, a
+  restarted proof server container, and a full cold wallet resync (`SB_WALLET_NO_CACHE=1`) all froze
+  at the identical step. The last successful submission was block 632945 on the afternoon of
+  2026-08-29. **A future session should not assume its own code broke.** Check
+  `contractAction` on the indexer first.
+- **The app-side witness export path has still never been run end to end into a submission.** The
+  export opens the Android share sheet and writes no file, so every attestation to date has proved
+  `midnight/contract/test/fixtures/sample-witness.json`, not a file that came off the device.
+- **Failed sends leave the user's message in the conversation.** In
+  `app/src/app/session/[id].tsx`, `appendUserMessage(text)` runs before the request and nothing removes
+  it on failure, so each retry visibly stacks another copy of the same message on screen. Observed
+  during recording. Not fixed — it is app-side behaviour, out of scope for the hackathon branch.
+- **The Android emulator's GPU crashed twice** with `bad window surface handle` and a graphics-driver
+  crash dialog. It is now running with `-gpu swiftshader_indirect` (software rendering), which is slower
+  but did not crash. Launch it detached via `Start-Process`, not as a child of a shell that might be
+  stopped — an emulator started as a background task was killed twice when its parent task ended.
+- **Recording gotcha:** Snipping Tool's microphone re-mutes itself on every new recording. Three of the
+  night's takes were silent because of it. Always play a clip back before trusting it.
+
+
 ## 2026-08-30 — Record day: demo number settled at seven, contest-required video opening added, Devpost filled to step 3
 
 Session ran from the afternoon of 2026-08-29 into the morning of 2026-08-30. The video was still
