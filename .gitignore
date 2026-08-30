@@ -9,3 +9,6 @@ dist/
 .wrangler/
 ios/
 android/
+
+# Exported witness files contain a private key — never commit one.
+*.local.json
