@@ -12,17 +12,27 @@ leaves a little air. Do not add sentences without cutting others.
 
 The two slow steps will ruin a take if they happen on camera:
 
-- [ ] **Run the pre-flight** — `npm run preflight -w sb-phase0-smoke` (from WSL). One command
+- [ ] **Run the pre-flight** — from WSL, all three lines:
+      ```bash
+      source ~/mnenv.sh
+      cd /mnt/c/dev/soundingboard/midnight
+      npm run preflight -w sb-phase0-smoke
+      ```
+      One command
       covers the next four things: it checks the proof server, syncs the wallet and refreshes the
       snapshot so the take never films a ~13 min cold sync, prints the DUST balance, and reads the
       contract's ledger back through the indexer. It prints `READY` or the list of problems.
       It deliberately does **not** submit: `attest` requires a claim strictly greater than the
       recorded milestone, so a warm-up submission would eat the headroom the demo needs to show
       the number going up.
-- [ ] **A witness file already exported** and sitting in Downloads, in case the phone leg fails.
-      `midnight/contract/test/fixtures/sample-witness.json` is the documented fallback.
-- [ ] App history contains **real completed rehearse sessions** — the count on screen should not
-      be 1. The sample witness holds seven real commitments, so seven is the number the narration says; one looks like a fixture.
+- [ ] **Know which witness the desktop leg proves.** "Export proof input" opens the Android
+      share sheet with the JSON as its payload — it does **not** leave a file in Downloads, so there
+      is nothing to pull afterwards unless you save it somewhere yourself during the take.
+      `midnight/contract/test/fixtures/sample-witness.json` is the documented fallback, and is what
+      the command below uses. It carries seven commitments too, so the number never changes.
+- [ ] App history shows **7 of 10 sessions ready to prove**. The emulator is seeded to exactly
+      seven eligible sessions, which is also what the sample witness holds and what the narration
+      says — the three have to agree on camera. One session would look like a fixture.
 - [ ] Browser: **notifications off**, bookmarks bar hidden, one clean profile window.
 - [ ] Phone: **do not disturb on**, screen recording ready, battery/notification bar tidy.
 - [ ] Decide the identity you will show on-chain and **do not show any wallet seed on screen.**
@@ -37,6 +47,17 @@ commitments, so 7 is both valid and visibly an increase:
 SB_CLAIMED=7 npm run attest -w sb-phase0-smoke
 ```
 
+That proves the **fixture**, not the file the camera just watched come off the phone: `attest`
+falls back to `sample-witness.json` unless `SB_WITNESS_FILE` says otherwise. Both hold seven
+commitments, but their keys differ, so the identity that lands on chain is the fixture's. Nothing
+on screen reveals which one it was, and the privacy property being demonstrated is identical. If
+you want the narration's "my key" to be literally true, save the export during the take and pass
+it instead:
+
+```bash
+SB_WITNESS_FILE=/path/to/exported.json SB_CLAIMED=7 npm run attest -w sb-phase0-smoke
+```
+
 **A scrolling teleprompter of this script** lives at `~/Desktop/soundingboard-teleprompter.html`
 (open in Chrome). It splits the two legs into timed acts — 60 s phone, 54 s desktop — with a
 countdown, a running clock, and an automatic stop between them so the two clips can be joined end
@@ -45,11 +66,16 @@ neither.
 
 ---
 
-## 0:00–0:20 — The problem (~50 words)
+## 0:00–0:20 — The problem (~63 words)
+
+> **Required by the contest rules:** the video must name the hackathon at the start. Do not cut
+> this line, and do not let a title card stand in for it — the rules say *state* it.
 
 > *Visual: app open on a rehearse session, mid-conversation.*
 
-"SoundingBoard lets you rehearse a difficult conversation out loud with an AI that pushes back,
+"Hi, I'm Darcy, and this is my demo for the Midnight Hackathon: August 2026.
+
+SoundingBoard lets you rehearse a difficult conversation out loud with an AI that pushes back,
 then scores how you did. Everything stays on the phone — transcripts, scores, all of it.
 
 Which is exactly right, until someone needs proof you did the work. Private, or provable. Until
@@ -68,8 +94,7 @@ input to anything that leaves the device. Export gives me a witness file: my key
 commitments.
 
 Proving can't run in the app — React Native has no WebAssembly — so the phone hands off to a
-browser. That turned out to be a useful boundary rather than a workaround: the device keeps the
-secrets, the browser does the maths."
+browser. The device keeps the secrets, the browser does the maths."
 
 ## 1:05–1:45 — The proof and the chain (~100 words)
 
