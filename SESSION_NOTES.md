@@ -1,5 +1,127 @@
 # Session notes
 
+## 2026-08-30 — Record day: demo number settled at seven, contest-required video opening added, Devpost filled to step 3
+
+Session ran from the afternoon of 2026-08-29 into the morning of 2026-08-30. The video was still
+not recorded when this session closed, with under three hours left before the deadline.
+
+**Done:**
+- **Settled the demo number at seven, everywhere.** A parallel session had changed the narration
+  from eight to seven (commit `3a1abad`), anchored on `midnight/contract/test/fixtures/sample-witness.json`,
+  which holds `claimed: 7` and seven real commitments padded to ten. But the emulator had been
+  deliberately seeded to eight the day before, so the phone would have shown "8" while the narration
+  said "seven". Re-seeded the Android emulator's practice history to exactly seven eligible sessions
+  by editing the AsyncStorage SQLite database directly (`run-as com.darcy.soundingboard sqlite3
+  databases/RKStorage`, table `catalystLocalStorage`, key `sb.history`). *Verification level:
+  rendered and screenshotted — the screen reads "7 of 10 sessions ready to prove", and the body copy
+  tracked it to "at least 7 rehearsal sessions".* Re-checked the database after the app rehydrated,
+  in case Zustand wrote back over it: still seven. Re-seed payloads for both counts are saved outside
+  the repo at `C:\dev\ideas\soundingboard-onchain-verify\sb-history-7.json` and
+  `sb-history-8-previous.json`.
+- **Confirmed the "of 10" denominator is `MAX_SESSIONS` in `app/src/lib/practiceProof.ts`** — the
+  circuit's capacity, not the number of sessions in history. Removing a session changes the numerator
+  only. The one dropped was the oldest completed rehearse entry; both excluded cases (one unfinished
+  rehearse, one vent session) were deliberately kept so the demo still exercises the exclusion logic.
+- **Found and fixed a contest requirement that nothing in the repo met.** The Devpost requirements
+  page states: "Your demo video must state the name of the hackathon at the beginning of the video."
+  Neither `midnight/DEMO_SCRIPT.md` nor the teleprompter had such a line. Added "Hi, I'm Darcy, and
+  this is my demo for the Midnight Hackathon: August 2026." to both, cutting compensating words from
+  each so the two-minute cap still holds. *Verification level: read from the live requirements page;
+  word counts recomputed after editing — the teleprompter is now 228 spoken words, about 91 seconds
+  inside its 115-second scroll.*
+- **Corrected two false claims in the demo-script checklist.** It said an exported witness file would
+  be "sitting in Downloads". It will not be: the app calls React Native's `Share.share({ message })`
+  (`app/src/app/practice-proof.tsx`), which hands the JSON to the system share sheet as text and never
+  writes a file. It also gave a bare `SB_CLAIMED=7 npm run attest` command, which defaults to the
+  sample fixture (`midnight/phase0-smoke/scripts/attest.ts`, line 58) rather than the phone's export.
+  Both carry seven commitments but different keys, so the identity reaching the chain is the
+  fixture's while the narration says "my key". Documented both, with the `SB_WITNESS_FILE=` form for
+  anyone who wants that line to be literally true. Committed as `5384099`.
+- **Verified the Settings gear opens the expo dev-client menu, not the app's Settings screen.**
+  Tapping it produced the "Runtime version: exposdk:57.0.0" sheet. This matters because the demo
+  script's shot list routed the phone leg through Settings. The teleprompter now says to cut and
+  deep-link instead. Reliable navigation is
+  `adb shell am start -a android.intent.action.VIEW -d "soundingboard://practice-proof" com.darcy.soundingboard`.
+  *Verification level: tapped and screenshotted.*
+- **Closed a private-key exposure in a public repository.** A file created by another session,
+  `midnight/contract/test/fixtures/backup-witness.local.json`, was untracked but **not** gitignored,
+  and contains a 64-character `secretKey`. Any `git add -A` would have published it into a repository
+  the contest rules require to stay public indefinitely. Added `*.local.json` to `.gitignore`
+  (commit `4036966`) rather than deleting the file, which is in use for record day.
+  *Verification level: `git check-ignore` confirms it is now ignored.*
+- **Kept a private key out of the Devpost gallery.** The existing screenshot
+  `practice-proof-export-share.png` shows the share sheet with a full `secretKey` legible on screen,
+  and also shows the stale count "5 of 10". Excluded it from the upload set and built a 1200x800
+  (3:2) gallery thumbnail instead. Upload set is at `C:\Users\Darcy\Desktop\devpost-images\`.
+- **Found that `master` carries none of this work.** `git show master:README.md` has zero mentions of
+  Midnight and no "What existed before the hackathon" section — the Integrate-track disclosure exists
+  only on the `midnight-hackathon` branch. A judge opening the plain repository URL would see a
+  parked app and no disclosure at all. The Devpost "Try it out" link was therefore set to
+  `https://github.com/darcy0408/soundingboard/tree/midnight-hackathon`.
+- **Devpost progress.** Steps 1 and 2 are saved: the story from `devpost-story.md` (with its leading
+  HTML comment stripped), twelve "Built with" tags, the branch repository link, and three gallery
+  images. The step-2 save was initially rejected with "Please enter 1 or more character", which
+  turned out to be the tag field not having committed its tokens, not the empty video field. Step 3
+  ("Additional info") was in progress at session close.
+- **Assessed the Lace browser-submission gap and recommended against closing it before filming.**
+  Every provider package is already installed and the ZK artifacts are staged in
+  `midnight/attest-app/public/zk/`; connector API 4.0.1 exposes `balanceUnsealedTransaction`,
+  `submitTransaction`, and a `prove()` taking DApp key material. The missing piece is roughly 60-120
+  lines adapting `ConnectedAPI` to midnight-js's provider interfaces. The blockers are environmental
+  rather than code: whether the installed Lace supports Preview at all, getting DUST into that
+  wallet, and extension-versus-API version drift.
+
+**Decisions:**
+- **Chose seven over reverting to eight.** Seven makes the phone, the narration, the sample fixture
+  and the chain claim all agree, and it means a failed phone leg can fall back to the fixture with no
+  narration change. Going back to eight would have required a live phone export to succeed on camera
+  and would have left the fixture stranded at a different number.
+- **Did not edit the teleprompter until the parallel session had clearly stopped.** It had been
+  modified minutes before this session first read it. Edited only after roughly eight hours of no
+  further changes. A backup was taken before editing.
+- **Ignored rather than deleted the backup witness file.** It is the fallback for record day; the
+  danger was that it could be committed, not that it exists.
+- **Recommended selecting only the Integrate Midnight track** on Devpost. Prior work is permitted
+  only on that track, so also ticking Mobile or AI risks reading as a submission to tracks that
+  disallow it.
+
+**Next:**
+1. **Record the video, with the required opening line.** Nothing else matters until it exists.
+2. **Upload to YouTube**, then finish Devpost steps 3-5 and submit. The deadline is
+   **2026-08-30 09:45 MDT**, and it is the final one.
+3. **Change the GitHub default branch to `midnight-hackathon`**, so anyone who trims the repository
+   URL still lands on the disclosure. Not done — it is a repository setting, not a commit.
+4. Move the on-chain verification package from `C:\dev\ideas\soundingboard-onchain-verify\` into
+   `midnight/`. Still outstanding from the previous session.
+
+**Blocked on user:**
+- **Recording the video.** Nothing substitutes for it.
+- **Discord username** for the Devpost "Additional info" step, plus the survey opinion fields
+  (experience rating, recommendation score, ZK familiarity).
+- **Devpost registration email matching the MLH event page** — the rules require both to match, and
+  it cannot be checked from the repository.
+- **Keeping the repository public indefinitely**, which the rules require.
+- The personal pre-submission check recorded at the end of `MIDNIGHT_PLAN.md` (untracked).
+
+**Risks/unverified:**
+- **The video was not recorded when this session closed**, with under three hours to the deadline.
+- **The preflight result was never seen.** `npm run preflight -w sb-phase0-smoke` was started from
+  WSL but its output never reached this session, so the **DUST balance is unknown** and it is not
+  established that a live submission can pay its fee. If DUST is short, the fallback is to film
+  against the attestation already on chain rather than submitting live.
+- **The teleprompter and `midnight/DEMO_SCRIPT.md` have diverged substantially.** The teleprompter is
+  a tighter rewrite with different wording and a single 115-second scroll; the script's instruction to
+  "edit both or neither" no longer describes reality. The required opening line is now in both, but
+  the rest is not in sync.
+- **The Lace browser submission path remains unexercised**, and the Connect-wallet button should not
+  appear on camera.
+- **The emulator's practice history is seeded demo data.** The persona names are invented fixtures and
+  should not be described on camera as real personal history.
+- Two sessions were writing to this tree throughout. Always `git fetch` and re-check `git status`
+  before committing, and stage paths individually — never `git add -A`, which would have published a
+  private key today had the ignore rule not been added.
+
+
 ## 2026-08-29 (later) — Submission audit: on-chain attestation independently verified, eligibility and compliance swept, README overstatement corrected
 
 Second work block on 2026-08-29, after the entry below. **It corrects three claims in that
