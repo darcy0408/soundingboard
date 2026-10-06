@@ -194,13 +194,13 @@ Per the Integrate track rules, the honest split.
 
 **Before the event** — the entire SoundingBoard app and Cloudflare Worker, public in this repo as of commit `dd2ca6a` (2026-07-27), at which point the project was parked: rehearse and vent modes, the persona system, push-to-talk with on-device speech recognition, the feedback scoring pipeline, local history storage, and 73 passing Worker tests. None of it had anything to do with Midnight or blockchain.
 
-**During the event**, all on the `midnight-hackathon` branch: everything under `midnight/` (the Compact contract, its tests, and the attest dApp), plus `app/src/lib/practiceProof.ts`, `app/src/app/practice-proof.tsx`, the Settings entry point that reaches them, and this documentation. The Worker is untouched.
+**During the event**, all on the `midnight-hackathon` branch (since merged into `master`): everything under `midnight/` (the Compact contract, its tests, and the attest dApp), plus `app/src/lib/practiceProof.ts`, `app/src/app/practice-proof.tsx`, the Settings entry point that reaches them, and this documentation. The Worker is untouched.
 
 ---
 
 ## Status
 
-Active for the MLH Midnight Hackathon (Aug 28–30 2026), on the `midnight-hackathon` branch.
+Submitted to the MLH Midnight Hackathon (Aug 28–30 2026). The hackathon work was built on the `midnight-hackathon` branch and is merged into `master`.
 
 The underlying app was **parked** before the event — feature-complete as a working prototype, store submission not pursued, published as a reference implementation rather than a shipping product:
 
