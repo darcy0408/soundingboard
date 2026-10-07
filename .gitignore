@@ -12,3 +12,6 @@ android/
 
 # Exported witness files contain a private key — never commit one.
 *.local.json
+
+# Session handoff notes are private; never commit them to this public repo
+SESSION_NOTES.md
